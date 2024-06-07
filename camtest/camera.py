@@ -2,7 +2,7 @@
 
 import argparse
 import sys
-import rerun as rr  # pip install rerun-sdk
+import rerun as rr
 import cv2
 try:
     import cv_bridge
@@ -14,7 +14,7 @@ try:
     from rclpy.node import Node
     from rclpy.qos import QoSDurabilityPolicy, QoSProfile
     from rclpy.time import Time
-    from sensor_msgs.msg import Image
+    from sensor_msgs.msg import Image, CameraInfo, CompressedImage
     from std_msgs.msg import String
     from tf2_ros.buffer import Buffer
     from tf2_ros.transform_listener import TransformListener
@@ -35,15 +35,15 @@ See: README.md for more details.
 class CameraSubscriber(Node):
     def __init__(self) -> None:
         super().__init__("rr_usb_cam")
-
-        latching_qos = QoSProfile(depth=1, durability=QoSDurabilityPolicy.TRANSIENT_LOCAL)
+        print(self.get_topic_names_and_types())
+        print(self.get_node_names())
 
         self.callback_group = ReentrantCallbackGroup()
         self.tf_buffer = Buffer()
         self.tf_listener = TransformListener(self.tf_buffer, self)
 
         self.path_to_frame = {
-            "camera": "camera_frame",
+            "camera": "camera",
         }
 
         self.model = PinholeCameraModel()
@@ -53,6 +53,30 @@ class CameraSubscriber(Node):
             Image,
             "/image_raw",
             self.image_callback,
+            10,
+            callback_group=self.callback_group,
+        )
+
+        self.camera_info_sub = self.create_subscription(
+            CameraInfo,
+            "/camera_info",
+            self.camera_info_callback,
+            10,
+            callback_group=self.callback_group,
+        )
+
+        self.compressed_img_sub = self.create_subscription(
+            CompressedImage,
+            "/image_raw/compressed",
+            self.camera_compressed_callback,
+            10,
+            callback_group=self.callback_group,
+        )
+
+        self.compressed_depth_sub = self.create_subscription(
+            CompressedImage,
+            "/image_raw/compressed",
+            self.camera_compressed_depth_callback,
             10,
             callback_group=self.callback_group,
         )
@@ -80,7 +104,25 @@ class CameraSubscriber(Node):
         else:
             raise ValueError(f"Unexpected image encoding: {img.encoding}")
 
-        rr.log("map/robot/camera/img", rr.Image(cv_image))
+        rr.log("camera/img", rr.Image(cv_image))
+
+    def camera_info_callback(self, msg: CameraInfo) -> None:
+        rr.log("camera/description", rr.TextLog(f"Received camera info, width={msg.width}, height={msg.height}", level=rr.TextLogLevel.INFO))
+
+    def camera_compressed_callback(self, msg: CompressedImage) -> None:
+        print(msg.format)
+        print(' '.join(format(byte, '08b') for byte in msg.data[:10]))
+        cv_image = self.cv_bridge.compressed_imgmsg_to_cv2(msg)
+        print(cv_image.shape)
+        cv_image = cv2.cvtColor(cv_image, cv2.CV_8UC1)
+        cv_image = cv2.cvtColor(cv_image, cv2.COLOR_YUV2RGB_YUY2)
+
+        rr.log("camera/compressed", rr.Image(cv_image))
+
+    def camera_compressed_depth_callback(self, msg: CompressedImage) -> None:
+        cv_image = self.cv_bridge.compressed_imgmsg_to_cv2(msg, "passthrough")
+
+        rr.log("camera/depth", rr.DepthImage(cv_image))
 
 def main() -> None:
     parser = argparse.ArgumentParser(description="Camera ROS node that republishes to Rerun.")
