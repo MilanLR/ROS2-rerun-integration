@@ -32,26 +32,7 @@ class RerunSubscriber(Node):
 
         self.cmap = matplotlib.colormaps["turbo_r"]
 
-    def listener_callback(self, msg):
-        ranges = np.array(msg.ranges)
-        for i, val in enumerate(ranges):
-            if val < msg.range_min:
-                ranges[i] = msg.range_min
-            elif val > msg.range_max:
-                ranges[i] = msg.range_max
-
-        lin_space = np.linspace(msg.angle_min, msg.angle_max, len(msg.ranges))
-        x_values = np.cos(lin_space) * ranges
-        y_values = np.sin(lin_space) * ranges
-
-        norm = matplotlib.colors.Normalize(vmin=0, vmax=10)
-
-        points = np.dstack((y_values, x_values))[0]
-        point_distances = np.linalg.norm(points, axis=1)
-        point_colors = self.cmap(norm(point_distances))
-
-        rr.log("lidar", rr.Points2D(points, colors=point_colors))
-
+    def listener_callback(self, msg: LaserScan):
         self.get_logger().info(f"min_angle:      {msg.angle_min}", once=True)
         self.get_logger().info(f"max_angle:      {msg.angle_max}", once=True)
         self.get_logger().info(f"angle_increment:{msg.angle_increment}", once=True)
@@ -60,6 +41,19 @@ class RerunSubscriber(Node):
         self.get_logger().info(f"range_min:      {msg.range_min}", once=True)
         self.get_logger().info(f"range_max:      {msg.range_max}", once=True)
         self.get_logger().info(f"range_len:      {len(msg.ranges)}", once=True)
+
+        ranges = np.array(msg.ranges)
+        lin_space = np.linspace(msg.angle_min, msg.angle_max, len(msg.ranges))
+
+        x_values_1 = np.cos(lin_space) * msg.range_min
+        y_values_1 = np.sin(lin_space) * msg.range_min
+        x_values_2 = np.cos(lin_space) * ranges
+        y_values_2 = np.sin(lin_space) * ranges
+
+        line_points = np.vstack([y_values_1, x_values_1, y_values_2, x_values_2])
+        lines = line_points.T.reshape(len(ranges), 2, 2)
+        lines = rr.LineStrips2D(lines)
+        rr.log("lidar", lines)
 
 
 def main(args=None):
