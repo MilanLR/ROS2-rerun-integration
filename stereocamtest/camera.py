@@ -33,12 +33,30 @@ See: README.md for more details.
     )
     sys.exit(1)
 
+typetotype = {
+    "sensor_msgs/msg/Image": Image,
+    "sensor_msgs/msg/CompressedImage": Image,
+    "sensor_msgs/msg/CameraInfo": CameraInfo,
+    "sensor_msgs/msg/PointCloud2": PointCloud2,
+    "std_msgs/msg/String": String,
+}
 
 class CameraSubscriber(Node):
     def __init__(self) -> None:
-        super().__init__("rr_usb_cam")
+        super().__init__("depth_cam")
         print(self.get_topic_names_and_types())
         print(self.get_node_names())
+
+        for (topic, typez) in self.get_topic_names_and_types():
+            typez =  typetotype[typez]
+            self.img_sub = self.create_subscription(
+                typez,
+                topic,
+                lambda x: print(f"topic: {topic}, type: {typez}, data: {x}"),
+                10,
+                callback_group=self.callback_group,
+            )
+
 
         self.callback_group = ReentrantCallbackGroup()
         self.tf_buffer = Buffer()
@@ -55,7 +73,15 @@ class CameraSubscriber(Node):
         self.img_sub = self.create_subscription(
             Image,
             "/camera/depth/image_raw",
-            self.raw_image_callback,
+            lambda x: self.raw_image_callback(x, "camera/depth"),
+            10,
+            callback_group=self.callback_group,
+        )
+
+        self.img_sub = self.create_subscription(
+            Image,
+            "/camera/rgb/image_raw",
+            lambda x: self.raw_image_callback(x, "camera/img"),
             10,
             callback_group=self.callback_group,
         )
@@ -79,7 +105,7 @@ class CameraSubscriber(Node):
             callback_group=self.callback_group,
         )
  
-    def raw_image_callback(self, img: Image, rerun_endpoint="camera/img") -> None:
+    def raw_image_callback(self, img: Image, rerun_endpoint) -> None:
         time = Time.from_msg(img.header.stamp)
         rr.set_time_nanos("ros_time", time.nanoseconds)
 
@@ -113,15 +139,6 @@ class CameraSubscriber(Node):
     def camera_info_callback(self, msg: CameraInfo) -> None:
         rr.log("camera/description", rr.TextLog(f"Received camera info, width={msg.width}, height={msg.height}", level=rr.TextLogLevel.INFO))
 
-    def camera_compressed_callback(self, msg: CompressedImage) -> None:
-        print(msg.format)
-        print(' '.join(format(byte, '08b') for byte in msg.data[:10]))
-        cv_image = self.cv_bridge.compressed_imgmsg_to_cv2(msg)
-        print(cv_image.shape)
-        cv_image = cv2.cvtColor(cv_image, cv2.CV_8UC1)
-        cv_image = cv2.cvtColor(cv_image, cv2.COLOR_YUV2RGB_YUY2)
-
-        rr.log("camera/compressed", rr.Image(cv_image))
 
 def main() -> None:
     parser = argparse.ArgumentParser(description="Camera ROS node that republishes to Rerun.")
