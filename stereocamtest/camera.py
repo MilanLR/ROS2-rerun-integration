@@ -6,18 +6,20 @@ import rerun as rr
 import cv2
 try:
     import cv_bridge
+    from numpy.lib.recfunctions import structured_to_unstructured
     import rclpy
-    import rerun_urdf
-    import trimesh
     from image_geometry import PinholeCameraModel
     from rclpy.callback_groups import ReentrantCallbackGroup
     from rclpy.node import Node
     from rclpy.qos import QoSDurabilityPolicy, QoSProfile
     from rclpy.time import Time
-    from sensor_msgs.msg import Image, CameraInfo, CompressedImage
+    from sensor_msgs.msg import Image, CameraInfo, CompressedImage, PointCloud2, PointField
+    from sensor_msgs_py import point_cloud2
     from std_msgs.msg import String
     from tf2_ros.buffer import Buffer
     from tf2_ros.transform_listener import TransformListener
+    from rclpy.qos import QoSProfile, QoSReliabilityPolicy, QoSHistoryPolicy
+
 except ImportError:
     print(
         """
@@ -44,6 +46,7 @@ class CameraSubscriber(Node):
 
         self.path_to_frame = {
             "camera": "camera",
+            "depth_registered": "depth_registered",
         }
 
         self.model = PinholeCameraModel()
@@ -51,60 +54,61 @@ class CameraSubscriber(Node):
 
         self.img_sub = self.create_subscription(
             Image,
-            "/image_raw",
-            self.image_callback,
+            "/camera/depth/image_raw",
+            self.raw_image_callback,
             10,
             callback_group=self.callback_group,
         )
 
-        self.camera_info_sub = self.create_subscription(
-            CameraInfo,
-            "/camera_info",
-            self.camera_info_callback,
-            10,
-            callback_group=self.callback_group,
-        )
+        # self.depth_registered_raw_sub = self.create_subscription(
+        #     Image,
+        #     "/camera/depth_registered/image_raw",
+        #     lambda x: self.raw_image_callback(x, "depth_registered/img"),
+        #     10,
+        #     callback_group=self.callback_group,
+        # )
 
-        self.compressed_img_sub = self.create_subscription(
-            CompressedImage,
-            "/image_raw/compressed",
-            self.camera_compressed_callback,
-            10,
-            callback_group=self.callback_group,
-        )
-
-        self.compressed_depth_sub = self.create_subscription(
-            CompressedImage,
-            "/image_raw/compressed",
-            self.camera_compressed_depth_callback,
-            10,
+        self.point_cloud_sub = self.create_subscription(
+            PointCloud2,
+            "/camera/depth_registered/points",
+            self.point_cloud_callback,
+            QoSProfile(
+                reliability=QoSReliabilityPolicy.BEST_EFFORT,
+                depth=1
+            ),
             callback_group=self.callback_group,
         )
  
-    def image_callback(self, img: Image) -> None:
+    def raw_image_callback(self, img: Image, rerun_endpoint="camera/img") -> None:
         time = Time.from_msg(img.header.stamp)
         rr.set_time_nanos("ros_time", time.nanoseconds)
 
         # Convert the ROS image message to a CV image
         cv_image = self.cv_bridge.imgmsg_to_cv2(img, "passthrough")
+        
+        rr.log(rerun_endpoint, rr.DepthImage(cv_image))
+    
+    def point_cloud_callback(self, points: PointCloud2) -> None:
+        print("pointing at cloudss")
+        pts = point_cloud2.read_points(points, field_names=["x", "y", "z"], skip_nans=True)
 
-        # Check if the image encoding is YUYV
-        if img.encoding == "yuyv":
-            # Convert YUYV to RGB
-            cv_image = cv2.cvtColor(cv_image, cv2.COLOR_YUV2RGB_YUYV)
-        elif img.encoding in ["yuv422_yuy2", "yuy2", "yuv422"]:
-            # Convert YUV422 (YUY2) to RGB
-            cv_image = cv2.cvtColor(cv_image, cv2.COLOR_YUV2RGB_YUY2)
-        elif img.encoding == "mono8":
-            # Handle single channel (grayscale) images
-            cv_image = cv2.cvtColor(cv_image, cv2.COLOR_GRAY2RGB)
-        elif img.encoding in ["rgb8", "bgr8"]:
-            # Handle already RGB/BGR images
-            pass
-        else:
-            raise ValueError(f"Unexpected image encoding: {img.encoding}")
+        # The realsense driver exposes a float field called 'rgb', but the data is actually stored
+        # as bytes within the payload (not a float at all). Patch points.field to use the correct
+        # r,g,b, offsets so we can extract them with read_points.
+        points.fields = [
+            PointField(name="r", offset=16, datatype=PointField.UINT8, count=1),
+            PointField(name="g", offset=17, datatype=PointField.UINT8, count=1),
+            PointField(name="b", offset=18, datatype=PointField.UINT8, count=1),
+        ]
 
-        rr.log("camera/img", rr.Image(cv_image))
+        colors = point_cloud2.read_points(points, field_names=["r", "g", "b"], skip_nans=True)
+
+        pts = structured_to_unstructured(pts)
+        colors = colors = structured_to_unstructured(colors)
+
+        # Log points once rigidly under robot/camera/points. This is a robot-centric
+        # view of the world.
+        rr.log("depth_registered/point_cloud", rr.Points3D(pts, colors=colors))
 
     def camera_info_callback(self, msg: CameraInfo) -> None:
         rr.log("camera/description", rr.TextLog(f"Received camera info, width={msg.width}, height={msg.height}", level=rr.TextLogLevel.INFO))
@@ -118,11 +122,6 @@ class CameraSubscriber(Node):
         cv_image = cv2.cvtColor(cv_image, cv2.COLOR_YUV2RGB_YUY2)
 
         rr.log("camera/compressed", rr.Image(cv_image))
-
-    def camera_compressed_depth_callback(self, msg: CompressedImage) -> None:
-        cv_image = self.cv_bridge.compressed_imgmsg_to_cv2(msg, "passthrough")
-
-        rr.log("camera/depth", rr.DepthImage(cv_image))
 
 def main() -> None:
     parser = argparse.ArgumentParser(description="Camera ROS node that republishes to Rerun.")
