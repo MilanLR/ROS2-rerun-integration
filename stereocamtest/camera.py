@@ -13,12 +13,16 @@ try:
     from rclpy.node import Node
     from rclpy.qos import QoSDurabilityPolicy, QoSProfile
     from rclpy.time import Time
-    from sensor_msgs.msg import Image, CameraInfo, CompressedImage, PointCloud2, PointField
+    from sensor_msgs.msg import Image, CameraInfo, CompressedImage, PointCloud2, PointField, JointState
     from sensor_msgs_py import point_cloud2
+    from rosgraph_msgs.msg import Clock
+    from rcl_interfaces.msg import ParameterEvent, Log
     from std_msgs.msg import String
+    from tf2_msgs.msg import TFMessage
     from tf2_ros.buffer import Buffer
     from tf2_ros.transform_listener import TransformListener
     from rclpy.qos import QoSProfile, QoSReliabilityPolicy, QoSHistoryPolicy
+    from theora_image_transport.msg import Packet
 
 except ImportError:
     print(
@@ -39,6 +43,12 @@ typetotype = {
     "sensor_msgs/msg/CameraInfo": CameraInfo,
     "sensor_msgs/msg/PointCloud2": PointCloud2,
     "std_msgs/msg/String": String,
+    "rcl_interfaces/msg/ParameterEvent": ParameterEvent,
+    "rosgraph_msgs/msg/Clock": Clock,
+    "sensor_msgs/msg/JointState": JointState,
+    "rcl_interfaces/msg/Log": Log,
+    "tf2_msgs/msg/TFMessage": TFMessage,
+    "theora_image_transport/msg/Packet": Packet,
 }
 
 class CameraSubscriber(Node):
@@ -46,17 +56,6 @@ class CameraSubscriber(Node):
         super().__init__("depth_cam")
         print(self.get_topic_names_and_types())
         print(self.get_node_names())
-
-        for (topic, typez) in self.get_topic_names_and_types():
-            typez =  typetotype[typez]
-            self.img_sub = self.create_subscription(
-                typez,
-                topic,
-                lambda x: print(f"topic: {topic}, type: {typez}, data: {x}"),
-                10,
-                callback_group=self.callback_group,
-            )
-
 
         self.callback_group = ReentrantCallbackGroup()
         self.tf_buffer = Buffer()
@@ -70,6 +69,25 @@ class CameraSubscriber(Node):
         self.model = PinholeCameraModel()
         self.cv_bridge = cv_bridge.CvBridge()
 
+        point_profile = QoSProfile(
+            reliability=QoSReliabilityPolicy.BEST_EFFORT,
+            depth=1
+        )
+
+        for (topic, typez) in self.get_topic_names_and_types():
+            print(topic)
+            typez = typetotype[typez[0]]
+            print(f"subbing topic: {topic}, type: {typez}")
+            self.create_subscription(
+                typez,
+                topic,
+                lambda x, topic=topic, typez=typez: print(f"topic: {topic}"),
+                10 if topic != '/camera/depth_registered/points' else point_profile,
+                callback_group=self.callback_group,
+            )
+
+
+
         self.img_sub = self.create_subscription(
             Image,
             "/camera/depth/image_raw",
@@ -80,11 +98,19 @@ class CameraSubscriber(Node):
 
         self.img_sub = self.create_subscription(
             Image,
-            "/camera/rgb/image_raw",
-            lambda x: self.raw_image_callback(x, "camera/img"),
+            "/camera/ir/image",
+            lambda x: self.raw_image_callback(x, "camera/ir"),
             10,
             callback_group=self.callback_group,
         )
+
+        # self.img_sub = self.create_subscription(
+        #     Image,
+        #     "/camera/rgb/image_raw",
+        #     lambda x: self.raw_image_callback(x, "camera/img"),
+        #     10,
+        #     callback_group=self.callback_group,
+        # )
 
         # self.depth_registered_raw_sub = self.create_subscription(
         #     Image,
@@ -94,16 +120,16 @@ class CameraSubscriber(Node):
         #     callback_group=self.callback_group,
         # )
 
-        self.point_cloud_sub = self.create_subscription(
-            PointCloud2,
-            "/camera/depth_registered/points",
-            self.point_cloud_callback,
-            QoSProfile(
-                reliability=QoSReliabilityPolicy.BEST_EFFORT,
-                depth=1
-            ),
-            callback_group=self.callback_group,
-        )
+        # self.point_cloud_sub = self.create_subscription(
+        #     PointCloud2,
+        #     "/camera/depth_registered/points",
+        #     self.point_cloud_callback,
+        #     QoSProfile(
+        #         reliability=QoSReliabilityPolicy.BEST_EFFORT,
+        #         depth=1
+        #     ),
+        #     callback_group=self.callback_group,
+        # )
  
     def raw_image_callback(self, img: Image, rerun_endpoint) -> None:
         time = Time.from_msg(img.header.stamp)
