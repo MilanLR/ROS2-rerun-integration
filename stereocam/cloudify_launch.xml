@@ -1,0 +1,10 @@
+<launch>
+  <node pkg="depth_image_proc" exec="point_cloud_xyz_node" name="depth" />
+
+  <node pkg="depth_image_proc" exec="point_cloud_xyz_node" name="depth">
+    <remap from="camera_info" to="/camera/depth/camera_info"/>
+    <remap from="image_rect" to="/camera/depth/image_raw"/>
+    <remap from="image_rect" to="/camera/depth/image_rect_raw"/>
+    <remap from="points" to="/camera/depth/points"/>
+  </node>
+</launch>

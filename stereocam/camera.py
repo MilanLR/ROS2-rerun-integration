@@ -3,39 +3,28 @@
 import argparse
 import sys
 import rerun as rr
+import rerun_urdf
 import cv2
-try:
-    import cv_bridge
-    from numpy.lib.recfunctions import structured_to_unstructured
-    import rclpy
-    from image_geometry import PinholeCameraModel
-    from rclpy.callback_groups import ReentrantCallbackGroup
-    from rclpy.node import Node
-    from rclpy.qos import QoSDurabilityPolicy, QoSProfile
-    from rclpy.time import Time
-    from sensor_msgs.msg import Image, CameraInfo, CompressedImage, PointCloud2, PointField, JointState
-    from sensor_msgs_py import point_cloud2
-    from rosgraph_msgs.msg import Clock
-    from rcl_interfaces.msg import ParameterEvent, Log
-    from std_msgs.msg import String
-    from tf2_msgs.msg import TFMessage
-    from tf2_ros.buffer import Buffer
-    from tf2_ros.transform_listener import TransformListener
-    from rclpy.qos import QoSProfile, QoSReliabilityPolicy, QoSHistoryPolicy
-    from theora_image_transport.msg import Packet
+import cv_bridge
+from numpy.lib.recfunctions import structured_to_unstructured
+import rclpy
+from image_geometry import PinholeCameraModel
+from rclpy.callback_groups import ReentrantCallbackGroup
+from rclpy.node import Node
+from rclpy.qos import QoSDurabilityPolicy, QoSProfile
+from rclpy.time import Time
+from sensor_msgs.msg import Image, CameraInfo, CompressedImage, PointCloud2, PointField, JointState
+from sensor_msgs_py import point_cloud2
+from rosgraph_msgs.msg import Clock
+from rcl_interfaces.msg import ParameterEvent, Log
+from std_msgs.msg import String
+from tf2_msgs.msg import TFMessage
+from tf2_ros.buffer import Buffer
+from tf2_ros.transform_listener import TransformListener
+from rclpy.qos import QoSProfile, QoSReliabilityPolicy, QoSHistoryPolicy
+from theora_image_transport.msg import Packet
+from tf2_ros import TransformException
 
-except ImportError:
-    print(
-        """
-Could not import the required ROS2 packages.
-
-Make sure you have installed ROS2 (https://docs.ros.org/en/humble/index.html)
-and sourced /opt/ros/humble/setup.bash
-
-See: README.md for more details.
-"""
-    )
-    sys.exit(1)
 
 typetotype = {
     "sensor_msgs/msg/Image": Image,
@@ -54,8 +43,6 @@ typetotype = {
 class CameraSubscriber(Node):
     def __init__(self) -> None:
         super().__init__("depth_cam")
-        print(self.get_topic_names_and_types())
-        print(self.get_node_names())
 
         self.callback_group = ReentrantCallbackGroup()
         self.tf_buffer = Buffer()
@@ -73,18 +60,6 @@ class CameraSubscriber(Node):
             reliability=QoSReliabilityPolicy.BEST_EFFORT,
             depth=1
         )
-
-        for (topic, typez) in self.get_topic_names_and_types():
-            print(topic)
-            typez = typetotype[typez[0]]
-            print(f"subbing topic: {topic}, type: {typez}")
-            self.create_subscription(
-                typez,
-                topic,
-                lambda x, topic=topic, typez=typez: print(f"topic: {topic}"),
-                10 if topic != '/camera/depth_registered/points' else point_profile,
-                callback_group=self.callback_group,
-            )
 
 
 
@@ -120,16 +95,16 @@ class CameraSubscriber(Node):
         #     callback_group=self.callback_group,
         # )
 
-        # self.point_cloud_sub = self.create_subscription(
-        #     PointCloud2,
-        #     "/camera/depth_registered/points",
-        #     self.point_cloud_callback,
-        #     QoSProfile(
-        #         reliability=QoSReliabilityPolicy.BEST_EFFORT,
-        #         depth=1
-        #     ),
-        #     callback_group=self.callback_group,
-        # )
+        self.point_cloud_sub = self.create_subscription(
+            PointCloud2,
+            "/camera/depth/points",
+            self.point_cloud_callback,
+            QoSProfile(
+                reliability=QoSReliabilityPolicy.BEST_EFFORT,
+                depth=1
+            ),
+            callback_group=self.callback_group,
+        )
  
     def raw_image_callback(self, img: Image, rerun_endpoint) -> None:
         time = Time.from_msg(img.header.stamp)
@@ -142,6 +117,34 @@ class CameraSubscriber(Node):
     
     def point_cloud_callback(self, points: PointCloud2) -> None:
         print("pointing at cloudss")
+        print("Header:", points.header)
+        print("Height:", points.height)
+        print("Width:", points.width)
+        print("Fields:", points.fields)
+        print("Is Big Endian:", points.is_bigendian)
+        print("Point Step:", points.point_step)
+        print("Row Step:", points.row_step)
+        print("Is Dense:", points.is_dense)
+        print("Data Length:", len(points.data))
+        print("Data:", points.data[:20])
+
+        time = Time.from_msg(points.header.stamp)
+        # pts = point_cloud2.read_points(points, field_names=["x", "y", "z"], skip_nans=True)
+        pts = point_cloud2.read_points(points, skip_nans=True)
+        print(pts.shape)
+        print(pts[0])
+
+        pts = structured_to_unstructured(pts)
+        print(pts.shape)
+        print(pts[0])
+
+        # Log points once rigidly under robot/camera/points. This is a robot-centric
+        # view of the world.
+        rr.log("depth_registered/point_cloud", rr.Points3D(pts))
+        # self.log_tf_as_transform3d("points", time)
+
+    def colored_point_cloud_callback(self, points: PointCloud2) -> None:
+
         pts = point_cloud2.read_points(points, field_names=["x", "y", "z"], skip_nans=True)
 
         # The realsense driver exposes a float field called 'rgb', but the data is actually stored
@@ -156,15 +159,34 @@ class CameraSubscriber(Node):
         colors = point_cloud2.read_points(points, field_names=["r", "g", "b"], skip_nans=True)
 
         pts = structured_to_unstructured(pts)
-        colors = colors = structured_to_unstructured(colors)
+        colors = structured_to_unstructured(colors)
 
         # Log points once rigidly under robot/camera/points. This is a robot-centric
         # view of the world.
         rr.log("depth_registered/point_cloud", rr.Points3D(pts, colors=colors))
 
+
     def camera_info_callback(self, msg: CameraInfo) -> None:
         rr.log("camera/description", rr.TextLog(f"Received camera info, width={msg.width}, height={msg.height}", level=rr.TextLogLevel.INFO))
 
+
+    def log_tf_as_transform3d(self, path: str, time: Time) -> None:
+        """Helper to look up a transform with tf and log using `log_transform3d`."""
+        # Get the parent path
+        parent_path = path.rsplit("/", 1)[0]
+
+        # Find the corresponding frames from the mapping
+        child_frame = self.path_to_frame[path]
+        parent_frame = self.path_to_frame[parent_path]
+
+        # Do the TF lookup to get transform from child (source) -> parent (target)
+        try:
+            tf = self.tf_buffer.lookup_transform(parent_frame, child_frame, time, timeout=Duration(seconds=0.1))
+            t = tf.transform.translation
+            q = tf.transform.rotation
+            rr.log(path, rr.Transform3D(translation=[t.x, t.y, t.z], rotation=rr.Quaternion(xyzw=[q.x, q.y, q.z, q.w])))
+        except TransformException as ex:
+            print(f"Failed to get transform: {ex}")
 
 def main() -> None:
     parser = argparse.ArgumentParser(description="Camera ROS node that republishes to Rerun.")
