@@ -128,7 +128,6 @@ class CameraSubscriber(Node):
         print("Data Length:", len(points.data))
         print("Data:", points.data[:20])
 
-        time = Time.from_msg(points.header.stamp)
         # pts = point_cloud2.read_points(points, field_names=["x", "y", "z"], skip_nans=True)
         pts = point_cloud2.read_points(points, skip_nans=True)
         print(pts.shape)
