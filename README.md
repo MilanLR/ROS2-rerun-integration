@@ -10,7 +10,7 @@ colcon build --symlink-install
 
 ## Source the setup
 ```bash
-. install/local_setup.bash
+. install/setup.bash
 ```
 
 ## Run the node
