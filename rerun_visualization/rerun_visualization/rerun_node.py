@@ -5,6 +5,8 @@ from rclpy.qos import QoSProfile
 
 from sensor_msgs.msg import LaserScan
 from trajectory_msgs.msg import JointTrajectory, JointTrajectoryPoint
+from nav_msgs.msg import Odometry
+from geometry_msgs.msg import Quaternion
 
 import numpy as np
 import math
@@ -21,6 +23,7 @@ rr.connect("10.0.8.92:9876")
 typetotype = {
     "sensor_msgs/msg/LaserScan": LaserScan,
     "trajectory_msgs/msg/JointTrajectory": JointTrajectory,
+    "nav_msgs/msg/Odometry": Odometry,
     #"sensor_msgs/msg/Image": Image,
     #"sensor_msgs/msg/CompressedImage": Image,
     #"sensor_msgs/msg/CameraInfo": CameraInfo,
@@ -48,6 +51,7 @@ class RerunNode(Node):
         self.supported_topics = {
             LaserScan: self.laserscan_callback,
             JointTrajectory: self.joint_trajectory_callback,
+            Odometry: self.odometry_callback,
         }
 
         #self.subscription = self.create_subscription(
@@ -140,6 +144,24 @@ class RerunNode(Node):
         lines = line_points.T.reshape(len(ranges), 2, 2)
         lines = rr.LineStrips2D(lines)
         rr.log("lidar", lines)
+
+    def odometry_callback(self, msg: Odometry):
+        pose = msg.pose.pose
+        position = pose.position
+        #rotation = np.array(rotation)
+
+        translation = np.array([position.x, position.y, position.z])
+
+        base = np.copy(translation)
+        tail = np.array([position.x + 0.1, position.y, position.z])
+
+        arrow = rr.Arrows3D(origins=[base], vectors=[tail])
+        #rr.log("odometry", arrow)
+        #rr.log("odometry", 
+
+        #rr.log("odometry", rr.Transform3D(translation=translation))
+        rr.log("odometry", rr.Points3D([translation]))
+
 
 
 def main(args=None):
