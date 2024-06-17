@@ -2,7 +2,6 @@
 
 import argparse
 import rerun as rr
-from rospy import Duration
 import cv2
 import cv_bridge
 from numpy.lib.recfunctions import structured_to_unstructured
@@ -168,25 +167,6 @@ class CameraSubscriber(Node):
 
     def camera_info_callback(self, msg: CameraInfo) -> None:
         rr.log("camera/description", rr.TextLog(f"Received camera info, width={msg.width}, height={msg.height}", level=rr.TextLogLevel.INFO))
-
-
-    def log_tf_as_transform3d(self, path: str, time: Time) -> None:
-        """Helper to look up a transform with tf and log using `log_transform3d`."""
-        # Get the parent path
-        parent_path = path.rsplit("/", 1)[0]
-
-        # Find the corresponding frames from the mapping
-        child_frame = self.path_to_frame[path]
-        parent_frame = self.path_to_frame[parent_path]
-
-        # Do the TF lookup to get transform from child (source) -> parent (target)
-        try:
-            tf = self.tf_buffer.lookup_transform(parent_frame, child_frame, time, timeout=Duration(seconds=0.1))
-            t = tf.transform.translation
-            q = tf.transform.rotation
-            rr.log(path, rr.Transform3D(translation=[t.x, t.y, t.z], rotation=rr.Quaternion(xyzw=[q.x, q.y, q.z, q.w])))
-        except TransformException as ex:
-            print(f"Failed to get transform: {ex}")
 
 def main() -> None:
     parser = argparse.ArgumentParser(description="Camera ROS node that republishes to Rerun.")
