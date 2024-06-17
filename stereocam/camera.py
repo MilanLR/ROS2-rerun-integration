@@ -1,9 +1,8 @@
 #!/usr/bin/env python3
 
 import argparse
-import sys
 import rerun as rr
-import rerun_urdf
+from rospy import Duration
 import cv2
 import cv_bridge
 from numpy.lib.recfunctions import structured_to_unstructured
@@ -11,9 +10,9 @@ import rclpy
 from image_geometry import PinholeCameraModel
 from rclpy.callback_groups import ReentrantCallbackGroup
 from rclpy.node import Node
-from rclpy.qos import QoSDurabilityPolicy, QoSProfile
+from rclpy.qos import QoSProfile
 from rclpy.time import Time
-from sensor_msgs.msg import Image, CameraInfo, CompressedImage, PointCloud2, PointField, JointState
+from sensor_msgs.msg import Image, CameraInfo, PointCloud2, JointState
 from sensor_msgs_py import point_cloud2
 from rosgraph_msgs.msg import Clock
 from rcl_interfaces.msg import ParameterEvent, Log
@@ -21,7 +20,7 @@ from std_msgs.msg import String
 from tf2_msgs.msg import TFMessage
 from tf2_ros.buffer import Buffer
 from tf2_ros.transform_listener import TransformListener
-from rclpy.qos import QoSProfile, QoSReliabilityPolicy, QoSHistoryPolicy
+from rclpy.qos import QoSProfile, QoSReliabilityPolicy
 from theora_image_transport.msg import Packet
 from tf2_ros import TransformException
 
@@ -65,16 +64,16 @@ class CameraSubscriber(Node):
 
         self.img_sub = self.create_subscription(
             Image,
-            "/camera/depth/image_raw",
-            lambda x: self.raw_image_callback(x, "camera/depth"),
+            "/camera/camera/depth/image_rect_raw",
+            lambda x: self.depth_image_callback(x, "camera/depth"),
             10,
             callback_group=self.callback_group,
         )
 
         self.img_sub = self.create_subscription(
             Image,
-            "/camera/ir/image",
-            lambda x: self.raw_image_callback(x, "camera/ir"),
+            "/camera/camera/color/image_raw",
+            lambda x: self.image_callback(x, "camera/rgb"),
             10,
             callback_group=self.callback_group,
         )
@@ -97,7 +96,7 @@ class CameraSubscriber(Node):
 
         self.point_cloud_sub = self.create_subscription(
             PointCloud2,
-            "/camera/depth/points",
+            "/camera/camera/depth/color/points",
             self.point_cloud_callback,
             QoSProfile(
                 reliability=QoSReliabilityPolicy.BEST_EFFORT,
@@ -106,7 +105,7 @@ class CameraSubscriber(Node):
             callback_group=self.callback_group,
         )
  
-    def raw_image_callback(self, img: Image, rerun_endpoint) -> None:
+    def depth_image_callback(self, img: Image, rerun_endpoint) -> None:
         time = Time.from_msg(img.header.stamp)
         rr.set_time_nanos("ros_time", time.nanoseconds)
 
@@ -114,7 +113,32 @@ class CameraSubscriber(Node):
         cv_image = self.cv_bridge.imgmsg_to_cv2(img, "passthrough")
         
         rr.log(rerun_endpoint, rr.DepthImage(cv_image))
-    
+
+    def image_callback(self, img: Image, rerun_endpoint) -> None:
+        time = Time.from_msg(img.header.stamp)
+        rr.set_time_nanos("ros_time", time.nanoseconds)
+
+        # Convert the ROS image message to a CV image
+        cv_image = self.cv_bridge.imgmsg_to_cv2(img, "passthrough")
+
+        # Check if the image encoding is YUYV
+        if img.encoding == "yuyv":
+            # Convert YUYV to RGB
+            cv_image = cv2.cvtColor(cv_image, cv2.COLOR_YUV2RGB_YUYV)
+        elif img.encoding in ["yuv422_yuy2", "yuy2", "yuv422"]:
+            # Convert YUV422 (YUY2) to RGB
+            cv_image = cv2.cvtColor(cv_image, cv2.COLOR_YUV2RGB_YUY2)
+        elif img.encoding == "mono8":
+            # Handle single channel (grayscale) images
+            cv_image = cv2.cvtColor(cv_image, cv2.COLOR_GRAY2RGB)
+        elif img.encoding in ["rgb8", "bgr8"]:
+            # Handle already RGB/BGR images
+            pass
+        else:
+            raise ValueError(f"Unexpected image encoding: {img.encoding}")
+
+        rr.log(rerun_endpoint, rr.Image(cv_image))
+
     def point_cloud_callback(self, points: PointCloud2) -> None:
         print("pointing at cloudss")
         print("Header:", points.header)
@@ -128,42 +152,19 @@ class CameraSubscriber(Node):
         print("Data Length:", len(points.data))
         print("Data:", points.data[:20])
 
-        # pts = point_cloud2.read_points(points, field_names=["x", "y", "z"], skip_nans=True)
-        pts = point_cloud2.read_points(points, skip_nans=True)
-        print(pts.shape)
-        print(pts[0])
-
-        pts = structured_to_unstructured(pts)
-        print(pts.shape)
-        print(pts[0])
-
-        # Log points once rigidly under robot/camera/points. This is a robot-centric
-        # view of the world.
-        rr.log("depth_registered/point_cloud", rr.Points3D(pts))
-        # self.log_tf_as_transform3d("points", time)
-
-    def colored_point_cloud_callback(self, points: PointCloud2) -> None:
-
         pts = point_cloud2.read_points(points, field_names=["x", "y", "z"], skip_nans=True)
 
-        # The realsense driver exposes a float field called 'rgb', but the data is actually stored
-        # as bytes within the payload (not a float at all). Patch points.field to use the correct
-        # r,g,b, offsets so we can extract them with read_points.
-        points.fields = [
-            PointField(name="r", offset=16, datatype=PointField.UINT8, count=1),
-            PointField(name="g", offset=17, datatype=PointField.UINT8, count=1),
-            PointField(name="b", offset=18, datatype=PointField.UINT8, count=1),
-        ]
-
-        colors = point_cloud2.read_points(points, field_names=["r", "g", "b"], skip_nans=True)
-
         pts = structured_to_unstructured(pts)
-        colors = structured_to_unstructured(colors)
 
-        # Log points once rigidly under robot/camera/points. This is a robot-centric
-        # view of the world.
-        rr.log("depth_registered/point_cloud", rr.Points3D(pts, colors=colors))
+        if "r" in [x.name for x in points.fields]:
+            colors = point_cloud2.read_points(points, field_names=["r", "g", "b"], skip_nans=True)
+            colors = structured_to_unstructured(colors)
+            rr.log("depth_registered/point_cloud", rr.Points3D(pts, colors=colors))
 
+        else:
+            # Log points once rigidly under robot/camera/points. This is a robot-centric
+            # view of the world.
+            rr.log("depth_registered/point_cloud", rr.Points3D(pts))
 
     def camera_info_callback(self, msg: CameraInfo) -> None:
         rr.log("camera/description", rr.TextLog(f"Received camera info, width={msg.width}, height={msg.height}", level=rr.TextLogLevel.INFO))

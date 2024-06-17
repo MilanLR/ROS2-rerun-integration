@@ -22,6 +22,7 @@ try:
     from tf2_ros.transform_listener import TransformListener
     from rclpy.qos import QoSProfile, QoSReliabilityPolicy
     from theora_image_transport.msg import Packet
+    from realsense2_camera_msgs.msg import Metadata, Extrinsics
 
 except ImportError:
     print(
@@ -48,6 +49,8 @@ typetotype = {
     "rcl_interfaces/msg/Log": Log,
     "tf2_msgs/msg/TFMessage": TFMessage,
     "theora_image_transport/msg/Packet": Packet,
+    "realsense2_camera_msgs/msg/Metadata": Metadata,
+    "realsense2_camera_msgs/msg/Extrinsics": Extrinsics,
 }
 
 class CameraSubscriber(Node):

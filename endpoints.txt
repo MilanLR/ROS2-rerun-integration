@@ -20,5 +20,41 @@
 ('/rosout', ['rcl_interfaces/msg/Log'])]
 
 
-
-[('/camera/depth/camera_info', ['sensor_msgs/msg/CameraInfo']), ('/camera/depth/image/compressed', ['sensor_msgs/msg/CompressedImage']), ('/camera/depth/image/compressedDepth', ['sensor_msgs/msg/CompressedImage']), ('/camera/depth/image/theora', ['theora_image_transport/msg/Packet']), ('/camera/depth/image_raw', ['sensor_msgs/msg/Image']), ('/camera/depth/image_raw/compressed', ['sensor_msgs/msg/CompressedImage']), ('/camera/depth/image_raw/compressedDepth', ['sensor_msgs/msg/CompressedImage']), ('/camera/depth/image_raw/theora', ['theora_image_transport/msg/Packet']), ('/camera/depth/points', ['sensor_msgs/msg/PointCloud2']), ('/camera/depth_registered/image_raw', ['sensor_msgs/msg/Image']), ('/camera/depth_registered/points', ['sensor_msgs/msg/PointCloud2']), ('/camera/ir/camera_info', ['sensor_msgs/msg/CameraInfo']), ('/camera/ir/image', ['sensor_msgs/msg/Image']), ('/camera/ir/image/compressed', ['sensor_msgs/msg/CompressedImage']), ('/camera/ir/image/compressedDepth', ['sensor_msgs/msg/CompressedImage']), ('/camera/ir/image/theora', ['theora_image_transport/msg/Packet']), ('/camera/projector/camera_info', ['sensor_msgs/msg/CameraInfo']), ('/camera/rgb/camera_info', ['sensor_msgs/msg/CameraInfo']), ('/camera/rgb/image_raw', ['sensor_msgs/msg/Image']), ('/clock', ['rosgraph_msgs/msg/Clock']), ('/depth_registered/image_rect', ['sensor_msgs/msg/Image']), ('/joint_states', ['sensor_msgs/msg/JointState']), ('/parameter_events', ['rcl_interfaces/msg/ParameterEvent']), ('/points', ['sensor_msgs/msg/PointCloud2']), ('/rgb/camera_info', ['sensor_msgs/msg/CameraInfo']), ('/rgb/image_rect_color', ['sensor_msgs/msg/Image']), ('/robot_description', ['std_msgs/msg/String']), ('/rosout', ['rcl_interfaces/msg/Log']), ('/tf', ['tf2_msgs/msg/TFMessage']), ('/tf_static', ['tf2_msgs/msg/TFMessage'])]
+/camera/camera/color/camera_info
+subbing topic: /camera/camera/color/camera_info, type: <class 'sensor_msgs.msg._camera_info.CameraInfo'>
+/camera/camera/color/image_raw
+subbing topic: /camera/camera/color/image_raw, type: <class 'sensor_msgs.msg._image.Image'>
+/camera/camera/color/image_raw/compressed
+subbing topic: /camera/camera/color/image_raw/compressed, type: <class 'sensor_msgs.msg._image.Image'>
+/camera/camera/color/image_raw/compressedDepth
+subbing topic: /camera/camera/color/image_raw/compressedDepth, type: <class 'sensor_msgs.msg._image.Image'>
+/camera/camera/color/image_raw/theora
+subbing topic: /camera/camera/color/image_raw/theora, type: <class 'theora_image_transport.msg._packet.Packet'>
+/camera/camera/color/metadata
+subbing topic: /camera/camera/color/metadata, type: <class 'realsense2_camera_msgs.msg._metadata.Metadata'>
+/camera/camera/depth/camera_info
+subbing topic: /camera/camera/depth/camera_info, type: <class 'sensor_msgs.msg._camera_info.CameraInfo'>
+/camera/camera/depth/color/points
+subbing topic: /camera/camera/depth/color/points, type: <class 'sensor_msgs.msg._point_cloud2.PointCloud2'>
+/camera/camera/depth/image_rect_raw
+subbing topic: /camera/camera/depth/image_rect_raw, type: <class 'sensor_msgs.msg._image.Image'>
+/camera/camera/depth/image_rect_raw/compressed
+subbing topic: /camera/camera/depth/image_rect_raw/compressed, type: <class 'sensor_msgs.msg._image.Image'>
+/camera/camera/depth/image_rect_raw/compressedDepth
+subbing topic: /camera/camera/depth/image_rect_raw/compressedDepth, type: <class 'sensor_msgs.msg._image.Image'>
+/camera/camera/depth/image_rect_raw/theora
+subbing topic: /camera/camera/depth/image_rect_raw/theora, type: <class 'theora_image_transport.msg._packet.Packet'>
+/camera/camera/depth/metadata
+subbing topic: /camera/camera/depth/metadata, type: <class 'realsense2_camera_msgs.msg._metadata.Metadata'>
+/camera/camera/extrinsics/depth_to_color
+subbing topic: /camera/camera/extrinsics/depth_to_color, type: <class 'realsense2_camera_msgs.msg._extrinsics.Extrinsics'>
+/camera/camera/extrinsics/depth_to_depth
+subbing topic: /camera/camera/extrinsics/depth_to_depth, type: <class 'realsense2_camera_msgs.msg._extrinsics.Extrinsics'>
+/parameter_events
+subbing topic: /parameter_events, type: <class 'rcl_interfaces.msg._parameter_event.ParameterEvent'>
+/rosout
+subbing topic: /rosout, type: <class 'rcl_interfaces.msg._log.Log'>
+/tf
+subbing topic: /tf, type: <class 'tf2_msgs.msg._tf_message.TFMessage'>
+/tf_static
+subbing topic: /tf_static, type: <class 'tf2_msgs.msg._tf_message.TFMessage'>
