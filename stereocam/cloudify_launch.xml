@@ -1,11 +1,14 @@
 <launch>
-  <node pkg="image_proc" exec="rectify_node" name="rect" >
-    <remap from="camera_info" to="/camera/depth/camera_info"/>
-    <remap from="image" to="/camera/depth/image_raw"/>
-  </node>
+  <!-- <node pkg="image_proc" exec="rectify_node" name="rect" >
+    <remap from="camera_info" to="/camera/camera/depth/camera_info"/>
+    <remap from="image" to="/camera/camera/depth/image_rect_raw"/>
+  </node> -->
 
   <node pkg="depth_image_proc" exec="point_cloud_xyz_node" name="depth">
-    <remap from="camera_info" to="/camera/depth/camera_info"/>
+    <remap from="image_rect" to="/camera/camera/depth/image_rect_raw"/>
+    <remap from="camera_info" to="/camera/camera/depth/camera_info"/>
+    <!-- <remap from="/camera/camera/depth/camera_info" to="camera_info"/>
+    <remap from="/camera/camera/depth/image_rect_raw" to="image_rect"/> -->
     <remap from="points" to="/camera/depth/points"/>
   </node>
 </launch>

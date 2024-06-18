@@ -95,7 +95,7 @@ class CameraSubscriber(Node):
 
         self.point_cloud_sub = self.create_subscription(
             PointCloud2,
-            "/camera/camera/depth/color/points",
+            "/camera/depth/points",
             self.point_cloud_callback,
             QoSProfile(
                 reliability=QoSReliabilityPolicy.BEST_EFFORT,
