@@ -16,7 +16,6 @@ from tf2_ros.buffer import Buffer
 from tf2_ros.transform_listener import TransformListener
 
 
-
 class RerunNode(Node):
     def __init__(self):
         super().__init__("rerun")
@@ -27,39 +26,55 @@ class RerunNode(Node):
         self.qos_profile = qos_profile
 
         self.joint_path_map = {}
-    
-    def auto_subscribe(self):
-        for (topic_name, topic_type) in self.get_topic_names_and_types():
-            match topic_name:
+
+        self.tf_buffer = Buffer()
+        self.tf_listener = TransformListener(self.tf_buffer, self)
+
+    def auto_subscribe(self, topics: Set[str] = set()):
+        for topic_name, topic_type in self.get_topic_names_and_types():
+            topic_type = topic_type[0]
+            print(f"topic_name: {topic_name}\ttopic_type: {topic_type}")
+            if topic_name not in topics:
+                continue
+
+            match topic_type:
                 case "sensor_msgs/msg/LaserScan":
                     from sensor_msgs.msg import LaserScan
+
                     topic_type = LaserScan
-                    topic_callback = self.laserscan_callback
+                    topic_callback = lambda x,: self.laserscan_callback(x, topic_name)
                 case "trajectory_msgs/msg/JointTrajectory":
                     from trajectory_msgs.msg import JointTrajectory
+
                     topic_type = JointTrajectory
-                    topic_callback = self.joint_trajectory_callback
+                    topic_callback = lambda x: self.joint_trajectory_callback(
+                        x, topic_name
+                    )
                 case "nav_msgs/msg/Odometry":
                     from nav_msgs.msg import Odometry
+
                     topic_type = Odometry
-                    topic_callback = self.odometry_callback
+                    topic_callback = lambda x: self.odometry_callback(x, topic_name)
                 case "sensor_msgs/msg/PointCloud2":
                     from sensor_msgs.msg import PointCloud2
+
                     topic_type = PointCloud2
-                    topic_callback = self.point_cloud_callback
+                    topic_callback = lambda x: self.point_cloud_callback(x, topic_name)
                 case "sensor_msgs/msg/Image":
                     from sensor_msgs.msg import Image
+
                     topic_type = Image
-                    topic_callback = self.image_callback
+                    topic_callback = lambda x: self.image_callback(x, topic_name)
                 case "sensor_msgs/msg/CompressedImage":
                     from sensor_msgs.msg import Image
+
                     topic_type = Image
-                    topic_callback = self.image_callback
+                    topic_callback = lambda x: self.image_callback(x, topic_name)
                 case _:
-                    print(f"topic {topic_name} not configured")
+                    print(f"topic {topic_type} not configured")
                     continue
 
-            print(f"subbing topic: {topic_name}, type: {topic_type}")
+            print(f"subscribing to topic: {topic_name}, type: {topic_type}")
             self.create_subscription(
                 topic_type,
                 topic_name,
@@ -67,13 +82,12 @@ class RerunNode(Node):
                 self.qos_profile,
             )
 
-
     def load_urdf(self, urdf_path: str):
         self.urdf_logger = make_urdf_logger(urdf_path)
         self.joint_path_map = self.urdf_logger.get_joint_path_map()
         self.urdf_logger.log()
 
-    def joint_trajectory_callback(self, msg: JointTrajectory):
+    def joint_trajectory_callback(self, msg, topic_name):
         # time = Time.from_msg(msg.header.stamp)
         # rr.set_time_nanos("ros_time", time.nanoseconds)
 
@@ -98,8 +112,8 @@ class RerunNode(Node):
             )
             rr.log(rerun_path, transform)
 
-        time = Time.from_msg(msg.header.stamp)
-        rr.set_time_nanos("ros_time", time.nanoseconds)
+        # time = Time.from_msg(msg.header.stamp)
+        # rr.set_time_nanos("ros_time", time.nanoseconds)
 
         for joint_name, joint_angle in list(
             zip(msg.joint_names, msg.points[0].positions)
@@ -138,7 +152,7 @@ class RerunNode(Node):
 
                 log_urdf_joint(*urdf_joint_data, origin, rotation)
 
-    def laserscan_callback(self, msg: LaserScan):
+    def laserscan_callback(self, msg, topic_name):
         # time = Time.from_msg(msg.header.stamp)
         # rr.set_time_nanos("ros_time", time.nanoseconds)
 
@@ -162,9 +176,9 @@ class RerunNode(Node):
         line_points = np.vstack([y_values_1, x_values_1, y_values_2, x_values_2])
         lines = line_points.T.reshape(len(ranges), 2, 2)
         lines = rr.LineStrips2D(lines)
-        rr.log("lidar", lines)
+        rr.log(topic_name, lines)
 
-    def odometry_callback(self, msg: Odometry):
+    def odometry_callback(self, msg, topic_name):
         # time = Time.from_msg(msg.header.stamp)
         # rr.set_time_nanos("ros_time", time.nanoseconds)
 
@@ -180,19 +194,18 @@ class RerunNode(Node):
         self._odometry_translation = translation
         self._odometry_rotation = rotation
 
-        rr.log("odometry", rr.Points3D([translation]))
+        rr.log(topic_name, rr.Points3D([translation]))
 
- 
-    def depth_image_callback(self, img: Image, rerun_endpoint) -> None:
+    def depth_image_callback(self, img, topic_name) -> None:
         time = Time.from_msg(img.header.stamp)
         rr.set_time_nanos("ros_time", time.nanoseconds)
 
         # Convert the ROS image message to a CV image
         cv_image = self.cv_bridge.imgmsg_to_cv2(img, "passthrough")
-        
-        rr.log(rerun_endpoint, rr.DepthImage(cv_image))
 
-    def image_callback(self, img: Image, rerun_endpoint) -> None:
+        rr.log(topic_name, rr.DepthImage(cv_image))
+
+    def image_callback(self, img, topic_name) -> None:
         time = Time.from_msg(img.header.stamp)
         rr.set_time_nanos("ros_time", time.nanoseconds)
 
@@ -215,9 +228,9 @@ class RerunNode(Node):
         else:
             raise ValueError(f"Unexpected image encoding: {img.encoding}")
 
-        rr.log(rerun_endpoint, rr.Image(cv_image))
+        rr.log(topic_name, rr.Image(cv_image))
 
-    def point_cloud_callback(self, points: PointCloud2) -> None:
+    def point_cloud_callback(self, points, topic_name) -> None:
         # print("pointing at cloudss")
         # print("Header:", points.header)
         # print("Height:", points.height)
@@ -230,7 +243,9 @@ class RerunNode(Node):
         # print("Data Length:", len(points.data))
         # print("Data:", points.data[:20])
 
-        pts = point_cloud2.read_points(points, field_names=["x", "y", "z"], skip_nans=True)
+        pts = point_cloud2.read_points(
+            points, field_names=["x", "y", "z"], skip_nans=True
+        )
 
         pts = structured_to_unstructured(pts)
 
@@ -240,14 +255,16 @@ class RerunNode(Node):
                 PointField(name="g", offset=17, datatype=PointField.UINT8, count=1),
                 PointField(name="b", offset=18, datatype=PointField.UINT8, count=1),
             ]
-            colors = point_cloud2.read_points(points, field_names=["r", "g", "b"], skip_nans=True)
+            colors = point_cloud2.read_points(
+                points, field_names=["r", "g", "b"], skip_nans=True
+            )
             colors = structured_to_unstructured(colors)
-            rr.log("depth_registered/point_cloud", rr.Points3D(pts, colors=colors))
+            rr.log(topic_name, rr.Points3D(pts, colors=colors))
 
         else:
             # Log points once rigidly under robot/camera/points. This is a robot-centric
             # view of the world.
-            rr.log("depth_registered/point_cloud", rr.Points3D(pts))
+            rr.log(topic_name, rr.Points3D(pts))
 
 
 def main(args=None):
