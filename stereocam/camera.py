@@ -11,7 +11,7 @@ from rclpy.callback_groups import ReentrantCallbackGroup
 from rclpy.node import Node
 from rclpy.qos import QoSProfile
 from rclpy.time import Time
-from sensor_msgs.msg import Image, CameraInfo, PointCloud2, JointState
+from sensor_msgs.msg import Image, CameraInfo, PointCloud2, JointState, PointField
 from sensor_msgs_py import point_cloud2
 from rosgraph_msgs.msg import Clock
 from rcl_interfaces.msg import ParameterEvent, Log
@@ -95,7 +95,7 @@ class CameraSubscriber(Node):
 
         self.point_cloud_sub = self.create_subscription(
             PointCloud2,
-            "/camera/depth/points",
+            "/camera/camera/depth/color/points",
             self.point_cloud_callback,
             QoSProfile(
                 reliability=QoSReliabilityPolicy.BEST_EFFORT,
@@ -139,23 +139,28 @@ class CameraSubscriber(Node):
         rr.log(rerun_endpoint, rr.Image(cv_image))
 
     def point_cloud_callback(self, points: PointCloud2) -> None:
-        print("pointing at cloudss")
-        print("Header:", points.header)
-        print("Height:", points.height)
-        print("Width:", points.width)
+        # print("pointing at cloudss")
+        # print("Header:", points.header)
+        # print("Height:", points.height)
+        # print("Width:", points.width)
         print("Fields:", points.fields)
-        print("Is Big Endian:", points.is_bigendian)
-        print("Point Step:", points.point_step)
-        print("Row Step:", points.row_step)
-        print("Is Dense:", points.is_dense)
-        print("Data Length:", len(points.data))
-        print("Data:", points.data[:20])
+        # print("Is Big Endian:", points.is_bigendian)
+        # print("Point Step:", points.point_step)
+        # print("Row Step:", points.row_step)
+        # print("Is Dense:", points.is_dense)
+        # print("Data Length:", len(points.data))
+        # print("Data:", points.data[:20])
 
         pts = point_cloud2.read_points(points, field_names=["x", "y", "z"], skip_nans=True)
 
         pts = structured_to_unstructured(pts)
 
-        if "r" in [x.name for x in points.fields]:
+        if "rgb" in [x.name for x in points.fields]:
+            points.fields = [
+                PointField(name="r", offset=16, datatype=PointField.UINT8, count=1),
+                PointField(name="g", offset=17, datatype=PointField.UINT8, count=1),
+                PointField(name="b", offset=18, datatype=PointField.UINT8, count=1),
+            ]
             colors = point_cloud2.read_points(points, field_names=["r", "g", "b"], skip_nans=True)
             colors = structured_to_unstructured(colors)
             rr.log("depth_registered/point_cloud", rr.Points3D(pts, colors=colors))
