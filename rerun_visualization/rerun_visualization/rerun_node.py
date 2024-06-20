@@ -1,7 +1,9 @@
+from typing import Set
 import rclpy
 from rclpy.node import Node
 from rclpy.qos import QoSDurabilityPolicy, QoSReliabilityPolicy
 from rclpy.qos import QoSProfile
+from rclpy.time import Time
 
 import numpy as np
 
@@ -9,8 +11,10 @@ import rerun as rr
 
 from rerun_visualization.urdf import make_urdf_logger
 
-rr.init("pupper")
-rr.connect("10.0.8.92:9876")
+from tf2_ros import TransformException, LookupException, ConnectivityException
+from tf2_ros.buffer import Buffer
+from tf2_ros.transform_listener import TransformListener
+
 
 
 class RerunNode(Node):
@@ -69,8 +73,10 @@ class RerunNode(Node):
         self.joint_path_map = self.urdf_logger.get_joint_path_map()
         self.urdf_logger.log()
 
-
     def joint_trajectory_callback(self, msg: JointTrajectory):
+        # time = Time.from_msg(msg.header.stamp)
+        # rr.set_time_nanos("ros_time", time.nanoseconds)
+
         def log_joint(joint_name, joint_angle):
             transform = rr.Transform3D(
                 rotation=rr.datatypes.RotationAxisAngle(
@@ -79,14 +85,21 @@ class RerunNode(Node):
             )
             rr.log(joint_name, transform)
 
-        def log_urdf_joint(rerun_path, joint):
+        def log_urdf_joint(rerun_path, joint, origin, rotation):
             transform = rr.Transform3D(
-                translation=joint.origin.xyz,
-                rotation=rr.datatypes.RotationAxisAngle(
-                    axis=joint.axis, angle=rr.datatypes.Angle(joint_angle)
-                ),
+                # translation=origin - joint.origin.xyz,
+                # translation=origin + joint.origin.xyz,
+                translation=origin,
+                # translation=np.array(joint.origin.xyz) - origin,
+                # rotation=rr.datatypes.RotationAxisAngle(
+                #    axis=joint.axis, angle=rr.datatypes.Angle(joint_angle)
+                # ),
+                rotation=rotation,
             )
             rr.log(rerun_path, transform)
+
+        time = Time.from_msg(msg.header.stamp)
+        rr.set_time_nanos("ros_time", time.nanoseconds)
 
         for joint_name, joint_angle in list(
             zip(msg.joint_names, msg.points[0].positions)
@@ -95,10 +108,40 @@ class RerunNode(Node):
             if urdf_joint_data is None:
                 log_joint(joint_name, joint_angle)
             else:
-                log_urdf_joint(*urdf_joint_data)
+                try:
+                    splitted_joint_name = joint_name.split("_")
+                    target_frame = splitted_joint_name[0]
+                    if target_frame == "base":
+                        target_frame = "base_link"
+                    source_frame = splitted_joint_name[1]
+                    transform_stamped = self.tf_buffer.lookup_transform(
+                        # target_frame='base_link',
+                        # source_frame=dest,
+                        target_frame=target_frame,
+                        source_frame=source_frame,
+                        time=rclpy.time.Time(),
+                    )
+                    transform = transform_stamped.transform
+                    translation = transform.translation
+                    origin = np.array([translation.x, translation.y, translation.z])
+                    rotation = transform.rotation
+                    rotation = np.array(
+                        [rotation.x, rotation.y, rotation.z, rotation.w]
+                    )
 
+                except (LookupException, ConnectivityException) as ex:
+                    self.get_logger().info(
+                        f"Could not transform {source_frame} to {target_frame}: {ex}"
+                    )
+                    origin = np.zeros(3)
+                    rotation = np.zeros((4, 4))
+
+                log_urdf_joint(*urdf_joint_data, origin, rotation)
 
     def laserscan_callback(self, msg: LaserScan):
+        # time = Time.from_msg(msg.header.stamp)
+        # rr.set_time_nanos("ros_time", time.nanoseconds)
+
         self.get_logger().info(f"min_angle:      {msg.angle_min}", once=True)
         self.get_logger().info(f"max_angle:      {msg.angle_max}", once=True)
         self.get_logger().info(f"angle_increment:{msg.angle_increment}", once=True)
@@ -122,20 +165,21 @@ class RerunNode(Node):
         rr.log("lidar", lines)
 
     def odometry_callback(self, msg: Odometry):
+        # time = Time.from_msg(msg.header.stamp)
+        # rr.set_time_nanos("ros_time", time.nanoseconds)
+
         pose = msg.pose.pose
         position = pose.position
-        #rotation = np.array(rotation)
+        orientation = pose.orientation
 
         translation = np.array([position.x, position.y, position.z])
+        rotation = np.array(
+            [orientation.x, orientation.y, orientation.z, orientation.w]
+        )
 
-        base = np.copy(translation)
-        tail = np.array([position.x + 0.1, position.y, position.z])
+        self._odometry_translation = translation
+        self._odometry_rotation = rotation
 
-        arrow = rr.Arrows3D(origins=[base], vectors=[tail])
-        #rr.log("odometry", arrow)
-        #rr.log("odometry", 
-
-        #rr.log("odometry", rr.Transform3D(translation=translation))
         rr.log("odometry", rr.Points3D([translation]))
 
  
@@ -207,12 +251,23 @@ class RerunNode(Node):
 
 
 def main(args=None):
+    rr.init("pupper")
+    rr.connect("10.0.8.92:9876")
+
     rclpy.init(args=args)
 
+    topics_to_subscribe_to = {
+        "/odom",
+        "/tf",
+        "/scan",
+        "/joint_group_effort_controller/joint_trajectory",
+    }
     rerun_node = RerunNode()
     rerun_node.get_logger().info("Hello friend!")
-    rerun_node.load_urdf("/home/ubuntu/mini_pupper_ros_urdf/mini_pupper_description/urdf/mini_pupper_description.urdf")
-    rerun_node.auto_subscribe()
+    rerun_node.load_urdf(
+        "/home/ubuntu/mini_pupper_ros_urdf/mini_pupper_description/urdf/mini_pupper_description.urdf"
+    )
+    rerun_node.auto_subscribe(topics=topics_to_subscribe_to)
 
     rclpy.spin(rerun_node)
 
