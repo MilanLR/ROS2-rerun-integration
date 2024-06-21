@@ -70,6 +70,11 @@ class RerunNode(Node):
 
                     topic_type = Image
                     topic_callback = lambda x: self.image_callback(x, topic_name)
+                case "nav_msgs/msg/OccupancyGrid":
+                    from nav_msgs.msg import OccupancyGrid
+                    
+                    topic_type = OccupancyGrid
+                    topic_callback = lambda x: self.map_callback(x, topic_name)
                 case _:
                     print(f"topic {topic_type} not configured")
                     continue
@@ -266,6 +271,39 @@ class RerunNode(Node):
             # view of the world.
             rr.log(topic_name, rr.Points3D(pts))
 
+    def map_callback(self, msg, topic_name):
+        image_data = np.ones((msg.info.height, msg.info.width, 3), dtype=np.uint8)
+
+        # transform = self.tf_buffer.lookup_transform("map", "odom", Time(), timeout=Duration(seconds=0.5))
+
+        for row in range(msg.info.height):
+            for col in range(msg.info.width):
+                value = msg.data[row * msg.info.width + col]
+                if value == -1:
+                    image_data[row, col] = [255, 0, 0]  # Red for -1
+                else:
+                    # Interpolate between black and white based on value
+                    intensity = int((value / 100) * 255)
+                    image_data[row, col] = [intensity, intensity, intensity]
+
+        # Log the occupancy grid as an image
+        rr.log(
+            f"{topic_name}/occupancy",
+            rr.Image(image_data),
+        )
+
+    def urdf_callback(self, urdf_msg, topic_name: str) -> None:
+        """Log a URDF using `log_scene` from `rerun_urdf`."""
+        urdf = rerun_urdf.load_urdf_from_msg(urdf_msg)
+
+        # The turtlebot URDF appears to have scale set incorrectly for the camera-link
+        # Although rviz loads it properly `yourdfpy` does not.
+        # orig, _ = urdf.scene.graph.get("camera_link")
+        # scale = trimesh.transformations.scale_matrix(0.00254)
+        # urdf.scene.graph.update(frame_to="camera_link", matrix=orig.dot(scale))
+        scaled = urdf.scene.scaled(1.0)
+
+        rerun_urdf.log_scene(scene=scaled, node=urdf.base_link, path=topic_name, static=True)
 
 def main(args=None):
     rr.init("pupper")
@@ -278,12 +316,13 @@ def main(args=None):
         "/tf",
         "/scan",
         "/joint_group_effort_controller/joint_trajectory",
+        "/map"
     }
     rerun_node = RerunNode()
     rerun_node.get_logger().info("Hello friend!")
-    rerun_node.load_urdf(
-        "/home/ubuntu/mini_pupper_ros_urdf/mini_pupper_description/urdf/mini_pupper_description.urdf"
-    )
+    # rerun_node.load_urdf(
+    #     "/home/ubuntu/mini_pupper_ros_urdf/mini_pupper_description/urdf/mini_pupper_description.urdf"
+    # )
     rerun_node.auto_subscribe(topics=topics_to_subscribe_to)
 
     rclpy.spin(rerun_node)

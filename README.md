@@ -15,5 +15,5 @@ colcon build --symlink-install
 
 ## Run the node
 ```bash
-ros2 run rerun_vizualization rerun_node
+ros2 run rerun_visualization rerun_node
 ```
