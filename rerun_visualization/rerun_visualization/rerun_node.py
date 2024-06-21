@@ -6,6 +6,7 @@ from rclpy.qos import QoSProfile
 from rclpy.time import Time
 
 import numpy as np
+from numpy.lib.recfunctions import structured_to_unstructured
 
 import rerun as rr
 
@@ -14,6 +15,9 @@ from rerun_visualization.urdf import make_urdf_logger
 from tf2_ros import TransformException, LookupException, ConnectivityException
 from tf2_ros.buffer import Buffer
 from tf2_ros.transform_listener import TransformListener
+
+import laser_geometry
+from sensor_msgs_py import point_cloud2
 
 
 class RerunNode(Node):
@@ -29,6 +33,8 @@ class RerunNode(Node):
 
         self.tf_buffer = Buffer()
         self.tf_listener = TransformListener(self.tf_buffer, self)
+
+        self.laser_proj = laser_geometry.laser_geometry.LaserProjection()
 
     def auto_subscribe(self, topics: Set[str] = set()):
         for topic_name, topic_type in self.get_topic_names_and_types():
@@ -183,23 +189,19 @@ class RerunNode(Node):
         lines = rr.LineStrips2D(lines)
         rr.log(topic_name, lines)
 
+        # time = Time.from_msg(msg.header.stamp)
+        # rr.set_time_nanos("ros_time", time.nanoseconds)
 
-        
+        # # Project the laser msg to a collection of points
+        # points = self.laser_proj.projectLaser(msg)
+        # pts = point_cloud2.read_points(points, field_names=["x", "y", "z"], skip_nans=True)
+        # pts = structured_to_unstructured(pts)
 
-        time = Time.from_msg(scan.header.stamp)
-        rr.set_time_nanos("ros_time", time.nanoseconds)
+        # # Turn every pt into a line-segment from the origin to the point.
+        # origin = (pts / np.linalg.norm(pts, axis=1).reshape(-1, 1)) * 0.3
+        # segs = np.hstack([origin, pts]).reshape(pts.shape[0] * 2, 3)
 
-        # Project the laser scan to a collection of points
-        points = self.laser_proj.projectLaser(scan)
-        pts = point_cloud2.read_points(points, field_names=["x", "y", "z"], skip_nans=True)
-        pts = structured_to_unstructured(pts)
-
-        # Turn every pt into a line-segment from the origin to the point.
-        origin = (pts / np.linalg.norm(pts, axis=1).reshape(-1, 1)) * 0.3
-        segs = np.hstack([origin, pts]).reshape(pts.shape[0] * 2, 3)
-
-        rr.log("map/robot/scan", rr.LineStrips3D(segs, radii=0.0025))
-        self.log_tf_as_transform3d("map/robot/scan", time)
+        # rr.log(topic_name, rr.LineStrips3D(segs, radii=0.0025))
 
     def odometry_callback(self, msg, topic_name):
         # time = Time.from_msg(msg.header.stamp)
