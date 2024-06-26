@@ -225,6 +225,9 @@ class RerunNode(Node):
         # Convert the ROS image message to a CV image
         cv_image = self.cv_bridge.imgmsg_to_cv2(img, "passthrough")
 
+        if "UC" in img.encoding or "FC" in img.encoding:
+            return rr.log(topic_name, rr.DepthImage(cv_image))
+
         # Check if the image encoding is YUYV
         if img.encoding == "yuyv":
             # Convert YUYV to RGB
