@@ -7,6 +7,7 @@ from rclpy.time import Time
 
 import numpy as np
 from numpy.lib.recfunctions import structured_to_unstructured
+import copy
 
 import rerun as rr
 
@@ -48,39 +49,40 @@ class RerunNode(Node):
                     from sensor_msgs.msg import LaserScan
 
                     topic_type = LaserScan
-                    topic_callback = lambda x,: self.laserscan_callback(x, topic_name)
+                    print(topic_name)
+                    topic_callback = lambda x, topic_name=copy.deepcopy(topic_name): self.laserscan_callback(x, topic_name)
                 case "trajectory_msgs/msg/JointTrajectory":
                     from trajectory_msgs.msg import JointTrajectory
 
                     topic_type = JointTrajectory
-                    topic_callback = lambda x: self.joint_trajectory_callback(
+                    topic_callback = lambda x, topic_name=copy.deepcopy(topic_name): self.joint_trajectory_callback(
                         x, topic_name
                     )
                 case "nav_msgs/msg/Odometry":
                     from nav_msgs.msg import Odometry
 
                     topic_type = Odometry
-                    topic_callback = lambda x: self.odometry_callback(x, topic_name)
+                    topic_callback = lambda x, topic_name=copy.deepcopy(topic_name): self.odometry_callback(x, topic_name)
                 case "sensor_msgs/msg/PointCloud2":
                     from sensor_msgs.msg import PointCloud2
 
                     topic_type = PointCloud2
-                    topic_callback = lambda x: self.point_cloud_callback(x, topic_name)
+                    topic_callback = lambda x, topic_name=copy.deepcopy(topic_name): self.point_cloud_callback(x, topic_name)
                 case "sensor_msgs/msg/Image":
                     from sensor_msgs.msg import Image
 
                     topic_type = Image
-                    topic_callback = lambda x: self.image_callback(x, topic_name)
+                    topic_callback = lambda x, topic_name=copy.deepcopy(topic_name): self.image_callback(x, topic_name)
                 case "sensor_msgs/msg/CompressedImage":
                     from sensor_msgs.msg import Image
 
                     topic_type = Image
-                    topic_callback = lambda x: self.image_callback(x, topic_name)
+                    topic_callback = lambda x, topic_name=copy.deepcopy(topic_name): self.image_callback(x, topic_name)
                 case "nav_msgs/msg/OccupancyGrid":
                     from nav_msgs.msg import OccupancyGrid
                     
                     topic_type = OccupancyGrid
-                    topic_callback = lambda x: self.map_callback(x, topic_name)
+                    topic_callback = lambda x, topic_name=copy.deepcopy(topic_name): self.map_callback(x, topic_name)
                 case _:
                     print(f"topic {topic_type} not configured")
                     continue
@@ -99,9 +101,6 @@ class RerunNode(Node):
         self.urdf_logger.log()
 
     def joint_trajectory_callback(self, msg, topic_name):
-        # time = Time.from_msg(msg.header.stamp)
-        # rr.set_time_nanos("ros_time", time.nanoseconds)
-
         def log_joint(joint_name, joint_angle):
             transform = rr.Transform3D(
                 rotation=rr.datatypes.RotationAxisAngle(
@@ -123,9 +122,6 @@ class RerunNode(Node):
             )
             rr.log(rerun_path, transform)
 
-        # time = Time.from_msg(msg.header.stamp)
-        # rr.set_time_nanos("ros_time", time.nanoseconds)
-
         for joint_name, joint_angle in list(
             zip(msg.joint_names, msg.points[0].positions)
         ):
@@ -140,8 +136,6 @@ class RerunNode(Node):
                         target_frame = "base_link"
                     source_frame = splitted_joint_name[1]
                     transform_stamped = self.tf_buffer.lookup_transform(
-                        # target_frame='base_link',
-                        # source_frame=dest,
                         target_frame=target_frame,
                         source_frame=source_frame,
                         time=rclpy.time.Time(),
@@ -164,9 +158,6 @@ class RerunNode(Node):
                 log_urdf_joint(*urdf_joint_data, origin, rotation)
 
     def laserscan_callback(self, msg, topic_name):
-        # time = Time.from_msg(msg.header.stamp)
-        # rr.set_time_nanos("ros_time", time.nanoseconds)
-
         self.get_logger().info(f"min_angle:      {msg.angle_min}", once=True)
         self.get_logger().info(f"max_angle:      {msg.angle_max}", once=True)
         self.get_logger().info(f"angle_increment:{msg.angle_increment}", once=True)
@@ -204,9 +195,6 @@ class RerunNode(Node):
         # rr.log(topic_name, rr.LineStrips3D(segs, radii=0.0025))
 
     def odometry_callback(self, msg, topic_name):
-        # time = Time.from_msg(msg.header.stamp)
-        # rr.set_time_nanos("ros_time", time.nanoseconds)
-
         pose = msg.pose.pose
         position = pose.position
         orientation = pose.orientation
@@ -340,9 +328,9 @@ def main(args=None):
     }
     rerun_node = RerunNode()
     rerun_node.get_logger().info("Hello friend!")
-    # rerun_node.load_urdf(
-    #     "/home/ubuntu/mini_pupper_ros_urdf/mini_pupper_description/urdf/mini_pupper_description.urdf"
-    # )
+    rerun_node.load_urdf(
+        "/home/ubuntu/mini_pupper_ros_urdf/mini_pupper_description/urdf/mini_pupper_description.urdf"
+    )
     rerun_node.auto_subscribe(topics=topics_to_subscribe_to)
 
     rclpy.spin(rerun_node)
