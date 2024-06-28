@@ -183,7 +183,7 @@ class RerunNode(Node):
                 cmap = matplotlib.colormaps["turbo_r"]
                 norm = matplotlib.colors.Normalize(vmin=msg.range_min, vmax=msg.range_max)
 
-                points = np.dstack((y_values_2, x_values_2))[0]
+                points = np.vstack((y_values_2, x_values_2)).T
                 point_distances = np.linalg.norm(points, axis=1)
                 point_colors = cmap(norm(point_distances))
 
