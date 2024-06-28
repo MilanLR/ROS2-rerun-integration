@@ -238,11 +238,9 @@ class RerunNode(Node):
         elif img.encoding == "mono8":
             # Handle single channel (grayscale) images
             cv_image = cv2.cvtColor(cv_image, cv2.COLOR_GRAY2RGB)
-        elif img.encoding in ["rgb8", "bgr8"]:
-            # Handle already RGB/BGR images
-            pass
+        # add more image encodings here
         else:
-            raise ValueError(f"Unexpected image encoding: {img.encoding}")
+            raise ValueError(f"Unexpected image encoding: {img.encoding}. Please add it to the image_callback method.")
 
         rr.log(topic_name, rr.Image(cv_image))
 
