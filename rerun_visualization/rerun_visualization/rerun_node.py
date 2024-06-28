@@ -1,4 +1,5 @@
 from typing import Set
+from enum import Enum
 import rclpy
 from rclpy.node import Node
 from rclpy.qos import QoSDurabilityPolicy, QoSReliabilityPolicy
@@ -8,6 +9,7 @@ from rclpy.time import Time
 import numpy as np
 from numpy.lib.recfunctions import structured_to_unstructured
 import copy
+import matplotlib
 
 import rerun as rr
 
@@ -21,8 +23,12 @@ import laser_geometry
 from sensor_msgs_py import point_cloud2
 
 
+class LidarVisualizationOption(Enum):
+    Lines = 1
+    Colour = 2
+
 class RerunNode(Node):
-    def __init__(self):
+    def __init__(self, lidar_visualization_option=LidarVisualizationOption.Colour):
         super().__init__("rerun")
 
         qos_profile = QoSProfile(depth=10)
@@ -36,6 +42,7 @@ class RerunNode(Node):
         self.tf_listener = TransformListener(self.tf_buffer, self)
 
         self.laser_proj = laser_geometry.laser_geometry.LaserProjection()
+        self.lidar_visualization_option=lidar_visualization_option
 
     def auto_subscribe(self, topics: Set[str] = set()):
         for topic_name, topic_type in self.get_topic_names_and_types():
@@ -49,7 +56,6 @@ class RerunNode(Node):
                     from sensor_msgs.msg import LaserScan
 
                     topic_type = LaserScan
-                    print(topic_name)
                     topic_callback = lambda x, topic_name=copy.deepcopy(topic_name): self.laserscan_callback(x, topic_name)
                 case "trajectory_msgs/msg/JointTrajectory":
                     from trajectory_msgs.msg import JointTrajectory
@@ -158,15 +164,6 @@ class RerunNode(Node):
                 log_urdf_joint(*urdf_joint_data, origin, rotation)
 
     def laserscan_callback(self, msg, topic_name):
-        self.get_logger().info(f"min_angle:      {msg.angle_min}", once=True)
-        self.get_logger().info(f"max_angle:      {msg.angle_max}", once=True)
-        self.get_logger().info(f"angle_increment:{msg.angle_increment}", once=True)
-        self.get_logger().info(f"time_increment: {msg.time_increment}", once=True)
-        self.get_logger().info(f"scan_time:      {msg.scan_time}", once=True)
-        self.get_logger().info(f"range_min:      {msg.range_min}", once=True)
-        self.get_logger().info(f"range_max:      {msg.range_max}", once=True)
-        self.get_logger().info(f"range_len:      {len(msg.ranges)}", once=True)
-
         ranges = np.array(msg.ranges)
         lin_space = np.linspace(msg.angle_min, msg.angle_max, len(msg.ranges))
 
@@ -175,24 +172,22 @@ class RerunNode(Node):
         x_values_2 = np.cos(lin_space) * ranges
         y_values_2 = np.sin(lin_space) * ranges
 
-        line_points = np.vstack([y_values_1, x_values_1, y_values_2, x_values_2])
-        lines = line_points.T.reshape(len(ranges), 2, 2)
-        lines = rr.LineStrips2D(lines)
-        rr.log(topic_name, lines)
+        match self.lidar_visualization_option:
+            case LidarVisualizationOption.Lines:
+                line_points = np.vstack([y_values_1, x_values_1, y_values_2, x_values_2])
+                lines = line_points.T.reshape(len(ranges), 2, 2)
+                lines = rr.LineStrips2D(lines)
 
-        # time = Time.from_msg(msg.header.stamp)
-        # rr.set_time_nanos("ros_time", time.nanoseconds)
+                rr.log(topic_name, lines)
+            case LidarVisualizationOption.Colour: 
+                cmap = matplotlib.colormaps["turbo_r"]
+                norm = matplotlib.colors.Normalize(vmin=msg.range_min, vmax=msg.range_max)
 
-        # # Project the laser msg to a collection of points
-        # points = self.laser_proj.projectLaser(msg)
-        # pts = point_cloud2.read_points(points, field_names=["x", "y", "z"], skip_nans=True)
-        # pts = structured_to_unstructured(pts)
+                points = np.dstack((y_values_2, x_values_2))[0]
+                point_distances = np.linalg.norm(points, axis=1)
+                point_colors = cmap(norm(point_distances))
 
-        # # Turn every pt into a line-segment from the origin to the point.
-        # origin = (pts / np.linalg.norm(pts, axis=1).reshape(-1, 1)) * 0.3
-        # segs = np.hstack([origin, pts]).reshape(pts.shape[0] * 2, 3)
-
-        # rr.log(topic_name, rr.LineStrips3D(segs, radii=0.0025))
+                rr.log(topic_name, rr.Points2D(points, colors=point_colors))
 
     def odometry_callback(self, msg, topic_name):
         pose = msg.pose.pose
@@ -526,6 +521,7 @@ class RerunNode(Node):
         rerun_urdf.log_scene(scene=scaled, node=urdf.base_link, path=topic_name, static=True)
 
 def main(args=None):
+    """This is just an example on how to use the RerunNode."""
     rr.init("pupper")
     rr.connect("10.0.8.92:9876")
 
@@ -538,8 +534,7 @@ def main(args=None):
         "/joint_group_effort_controller/joint_trajectory",
         "/map"
     }
-    rerun_node = RerunNode()
-    rerun_node.get_logger().info("Hello friend!")
+    rerun_node = RerunNode(lidar_visualization_option=LidarVisualizationOption.Colour)
     rerun_node.load_urdf(
         "/home/ubuntu/mini_pupper_ros_urdf/mini_pupper_description/urdf/mini_pupper_description.urdf"
     )
