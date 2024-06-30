@@ -178,7 +178,7 @@ export TURTLEBOT3_MODEL=burger
 ros2 launch turtlebot3_bringup robot.launch.py
 ```
 
-#### In another terminal, run Swanky
+#### In another terminal, install Swanky
 
 ```bash
 cd
@@ -195,3 +195,11 @@ colcon build --symlink-install && \
     . install/setup.bash && \
     ros2 run rerun_visualization rerun_node
 ```
+
+
+#### Run the generic cartographer node
+```bash
+. install/setup.bash
+ros2 run rerun_visualization generic_cartographer
+```
+
