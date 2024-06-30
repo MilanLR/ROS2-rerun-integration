@@ -104,6 +104,12 @@ colcon build --symlink-install && \
     ros2 run rerun_visualization rerun_node
 ```
 
+#### Run the generic cartographer node
+```bash
+. install/setup.bash
+ros2 run rerun_visualization generic_cartographer
+```
+
 # Turtle-bot setup
 
 #### First, flash Ubuntu for the raspberry pi 4 onto an micro SD card, see `https://ubuntu.com/download/raspberry-pi`. For additional setup of the network and ssh see `https://emanual.robotis.com/docs/en/platform/turtlebot3/sbc_setup/#sbc-setup`.
@@ -195,7 +201,6 @@ colcon build --symlink-install && \
     . install/setup.bash && \
     ros2 run rerun_visualization rerun_node
 ```
-
 
 #### Run the generic cartographer node
 ```bash
