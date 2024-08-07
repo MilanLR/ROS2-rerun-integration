@@ -70,7 +70,7 @@ reboot
 #### On the host machine, install rust
 
 ```bash
-curl --proto '=https' --tlsv1.2 -sSf <https://sh.rustup.rs> | sh
+curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
 ```
 
 #### Then install rerun
@@ -105,6 +105,7 @@ colcon build --symlink-install && \
 ```
 
 #### Run the generic cartographer node
+
 ```bash
 . install/setup.bash
 ros2 run rerun_visualization generic_cartographer
@@ -112,17 +113,19 @@ ros2 run rerun_visualization generic_cartographer
 
 # Turtle-bot setup
 
-#### First, flash Ubuntu for the raspberry pi 4 onto an micro SD card, see `https://ubuntu.com/download/raspberry-pi`. For additional setup of the network and ssh see `https://emanual.robotis.com/docs/en/platform/turtlebot3/sbc_setup/#sbc-setup`.
+#### First, flash Ubuntu for the raspberry pi 4 onto an micro SD card, see `https://ubuntu.com/download/raspberry-pi`. For additional setup of the network and ssh see `https://emanual.robotis.com/docs/en/platform/turtlebot3/sbc_setup/#sbc-setup`
 
 #### Install ros2 humble following `https://docs.ros.org/en/humble/Installation/Ubuntu-Install-Debians.html`
 
 #### Install ros2 cartographer
+
 ```bash
 sudo apt install ros-humble-cartographer
 sudo apt install ros-humble-cartographer-ros
 ```
 
 #### Install TurtleBot3 packages and drivers
+
 ```bash
 sudo apt install ros-humble-hls-lfcd-lds-driver
 sudo apt install ros-humble-turtlebot3-msgs
@@ -131,6 +134,7 @@ sudo apt install libudev-dev
 ```
 
 #### Clone the nodes necessary for bringup and teleop
+
 ```bash
 mkdir -p ~/turtlebot3_ws/src && cd ~/turtlebot3_ws/src
 git clone -b humble-devel https://github.com/ROBOTIS-GIT/turtlebot3.git
@@ -139,6 +143,7 @@ cd ~/turtlebot3_ws/
 ```
 
 #### Build the nodes
+
 ```bash
 echo 'source /opt/ros/humble/setup.bash' >> ~/.bashrc
 source ~/.bashrc
@@ -148,6 +153,7 @@ source ~/.bashrc
 ```
 
 #### Setup the USB port for OpenCR
+
 ```bash
 sudo cp `ros2 pkg prefix turtlebot3_bringup`/share/turtlebot3_bringup/script/99-turtlebot3-cdc.rules /etc/udev/rules.d/
 sudo udevadm control --reload-rules
@@ -155,12 +161,14 @@ sudo udevadm trigger
 ```
 
 #### Set the LDS model type
+
 ```bash
 echo 'export LDS_MODEL=LDS-02' >> ~/.bashrc # or LDS-01
 source ~/.bashrc
 ```
 
 #### Install packages to be able flash OpenCR board
+
 ```bash
 sudo dpkg --add-architecture armhf
 sudo apt update
@@ -171,6 +179,7 @@ rm -rf ./opencr_update.tar.bz2
 ```
 
 #### Flash the OpenCR board
+
 ```bash
 wget https://github.com/ROBOTIS-GIT/OpenCR-Binaries/raw/master/turtlebot3/ROS2/latest/opencr_update.tar.bz2
 tar -xvf ./opencr_update.tar.bz2
@@ -179,6 +188,7 @@ cd ~/opencr_update
 ```
 
 #### Run the bringup node
+
 ```bash
 export TURTLEBOT3_MODEL=burger
 ros2 launch turtlebot3_bringup robot.launch.py
@@ -203,8 +213,8 @@ colcon build --symlink-install && \
 ```
 
 #### Run the generic cartographer node
+
 ```bash
 . install/setup.bash
 ros2 run rerun_visualization generic_cartographer
 ```
-
