@@ -24,6 +24,8 @@ from sensor_msgs_py import point_cloud2
 
 import cv2
 
+RUNNING_ON_PUPPER = False
+
 
 class LidarVisualizationOption(Enum):
     Lines = 1
@@ -576,8 +578,11 @@ class RerunNode(Node):
 
 def main(args=None):
     """This is just an example on how to use the RerunNode."""
-    rr.init("pupper")
-    rr.connect("10.0.8.104:9876")
+    if RUNNING_ON_PUPPER:
+        rr.init("pupper")
+        rr.connect("10.0.8.104:9876")
+    else:
+        rr.init("local", spawn=True)
 
     rclpy.init(args=args)
 
@@ -589,9 +594,10 @@ def main(args=None):
         "/map",
     }
     rerun_node = RerunNode(lidar_visualization_option=LidarVisualizationOption.Colour)
-    rerun_node.load_urdf(
-        "/home/ubuntu/mini_pupper_ros_urdf/mini_pupper_description/urdf/mini_pupper_description.urdf"
-    )
+    if RUNNING_ON_PUPPER:
+        rerun_node.load_urdf(
+            "/home/ubuntu/mini_pupper_ros_urdf/mini_pupper_description/urdf/mini_pupper_description.urdf"
+        )
     rerun_node.auto_subscribe(topics=topics_to_subscribe_to)
 
     rclpy.spin(rerun_node)
