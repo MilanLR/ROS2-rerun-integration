@@ -104,6 +104,13 @@ colcon build --symlink-install && \
     ros2 run rerun_visualization rerun_node
 ```
 
+#### Install ros2 cartographer
+
+```bash
+sudo apt install ros-humble-cartographer
+sudo apt install ros-humble-cartographer-ros
+```
+
 #### Run the generic cartographer node
 
 ```bash
@@ -216,5 +223,5 @@ colcon build --symlink-install && \
 
 ```bash
 . install/setup.bash
-ros2 run rerun_visualization generic_cartographer
+ros2 launch generic_cartographer cartographer.launch.py
 ```
