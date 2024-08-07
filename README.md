@@ -108,7 +108,7 @@ colcon build --symlink-install && \
 
 ```bash
 . install/setup.bash
-ros2 run rerun_visualization generic_cartographer
+ros2 launch generic_cartographer cartographer.launch.py
 ```
 
 # Turtle-bot setup
