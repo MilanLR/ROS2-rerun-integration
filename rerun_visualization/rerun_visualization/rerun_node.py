@@ -24,13 +24,16 @@ from sensor_msgs_py import point_cloud2
 
 import cv2
 
-class LidarVisualizationOption(Enum):
-    Lines = 1
-    Colour = 2
 
 class LidarVisualizationOption(Enum):
     Lines = 1
     Colour = 2
+
+
+class LidarVisualizationOption(Enum):
+    Lines = 1
+    Colour = 2
+
 
 class RerunNode(Node):
     def __init__(self, lidar_visualization_option=LidarVisualizationOption.Colour):
@@ -47,7 +50,7 @@ class RerunNode(Node):
         self.tf_listener = TransformListener(self.tf_buffer, self)
 
         self.laser_proj = laser_geometry.laser_geometry.LaserProjection()
-        self.lidar_visualization_option=lidar_visualization_option
+        self.lidar_visualization_option = lidar_visualization_option
 
     def auto_subscribe(self, topics: Set[str] = set()):
         for topic_name, topic_type in self.get_topic_names_and_types():
@@ -61,39 +64,51 @@ class RerunNode(Node):
                     from sensor_msgs.msg import LaserScan
 
                     topic_type = LaserScan
-                    topic_callback = lambda x, topic_name=copy.deepcopy(topic_name): self.laserscan_callback(x, topic_name)
+                    topic_callback = lambda x, topic_name=copy.deepcopy(
+                        topic_name
+                    ): self.laserscan_callback(x, topic_name)
                 case "trajectory_msgs/msg/JointTrajectory":
                     from trajectory_msgs.msg import JointTrajectory
 
                     topic_type = JointTrajectory
-                    topic_callback = lambda x, topic_name=copy.deepcopy(topic_name): self.joint_trajectory_callback(
-                        x, topic_name
-                    )
+                    topic_callback = lambda x, topic_name=copy.deepcopy(
+                        topic_name
+                    ): self.joint_trajectory_callback(x, topic_name)
                 case "nav_msgs/msg/Odometry":
                     from nav_msgs.msg import Odometry
 
                     topic_type = Odometry
-                    topic_callback = lambda x, topic_name=copy.deepcopy(topic_name): self.odometry_callback(x, topic_name)
+                    topic_callback = lambda x, topic_name=copy.deepcopy(
+                        topic_name
+                    ): self.odometry_callback(x, topic_name)
                 case "sensor_msgs/msg/PointCloud2":
                     from sensor_msgs.msg import PointCloud2
 
                     topic_type = PointCloud2
-                    topic_callback = lambda x, topic_name=copy.deepcopy(topic_name): self.point_cloud_callback(x, topic_name)
+                    topic_callback = lambda x, topic_name=copy.deepcopy(
+                        topic_name
+                    ): self.point_cloud_callback(x, topic_name)
                 case "sensor_msgs/msg/Image":
                     from sensor_msgs.msg import Image
 
                     topic_type = Image
-                    topic_callback = lambda x, topic_name=copy.deepcopy(topic_name): self.image_callback(x, topic_name)
+                    topic_callback = lambda x, topic_name=copy.deepcopy(
+                        topic_name
+                    ): self.image_callback(x, topic_name)
                 case "sensor_msgs/msg/CompressedImage":
                     from sensor_msgs.msg import Image
 
                     topic_type = Image
-                    topic_callback = lambda x, topic_name=copy.deepcopy(topic_name): self.image_callback(x, topic_name)
+                    topic_callback = lambda x, topic_name=copy.deepcopy(
+                        topic_name
+                    ): self.image_callback(x, topic_name)
                 case "nav_msgs/msg/OccupancyGrid":
                     from nav_msgs.msg import OccupancyGrid
-                    
+
                     topic_type = OccupancyGrid
-                    topic_callback = lambda x, topic_name=copy.deepcopy(topic_name): self.map_callback(x, topic_name)
+                    topic_callback = lambda x, topic_name=copy.deepcopy(
+                        topic_name
+                    ): self.map_callback(x, topic_name)
                 case _:
                     print(f"topic {topic_type} not configured")
                     continue
@@ -179,14 +194,18 @@ class RerunNode(Node):
 
         match self.lidar_visualization_option:
             case LidarVisualizationOption.Lines:
-                line_points = np.vstack([y_values_1, x_values_1, y_values_2, x_values_2])
+                line_points = np.vstack(
+                    [y_values_1, x_values_1, y_values_2, x_values_2]
+                )
                 lines = line_points.T.reshape(len(ranges), 2, 2)
                 lines = rr.LineStrips2D(lines)
 
                 rr.log(topic_name, lines)
-            case LidarVisualizationOption.Colour: 
+            case LidarVisualizationOption.Colour:
                 cmap = matplotlib.colormaps["turbo_r"]
-                norm = matplotlib.colors.Normalize(vmin=msg.range_min, vmax=msg.range_max)
+                norm = matplotlib.colors.Normalize(
+                    vmin=msg.range_min, vmax=msg.range_max
+                )
 
                 points = np.vstack((y_values_2, x_values_2)).T
                 point_distances = np.linalg.norm(points, axis=1)
@@ -240,7 +259,9 @@ class RerunNode(Node):
             cv_image = cv2.cvtColor(cv_image, cv2.COLOR_GRAY2RGB)
         # add more image encodings here
         else:
-            raise ValueError(f"Unexpected image encoding: {img.encoding}. Please add it to the image_callback method.")
+            raise ValueError(
+                f"Unexpected image encoding: {img.encoding}. Please add it to the image_callback method."
+            )
 
         rr.log(topic_name, rr.Image(cv_image))
 
@@ -280,10 +301,12 @@ class RerunNode(Node):
             # view of the world.
             rr.log(topic_name, rr.Points3D(pts))
 
-     def map_callback(self, msg, topic_name):
+    def map_callback(self, msg, topic_name):
         image_data = np.ones((msg.info.height, msg.info.width, 3), dtype=np.uint8)
 
-        transform = self.tf_buffer.lookup_transform("map", "base_footprint", Time(), timeout=Duration(seconds=10))
+        transform = self.tf_buffer.lookup_transform(
+            "map", "base_footprint", Time(), timeout=Duration(seconds=10)
+        )
 
         for row in range(msg.info.height):
             for col in range(msg.info.width):
@@ -322,12 +345,16 @@ class RerunNode(Node):
         #         cv2.line(edged, (x1, y1), (x2, y2), (0, 0, 255), 2)
 
         # Apply Hough pobabilistic line transform to detect lines in the image
-        lines = cv2.HoughLinesP(edges, 1, np.pi / 180, threshold=60, minLineLength=10, maxLineGap=10)
+        lines = cv2.HoughLinesP(
+            edges, 1, np.pi / 180, threshold=60, minLineLength=10, maxLineGap=10
+        )
 
         def distance_to_line(point, line):
             x1, y1, x2, y2 = line
             x0, y0 = point
-            return np.abs((y2 - y1) * x0 - (x2 - x1) * y0 + x2 * y1 - y2 * x1) / np.sqrt((y2 - y1) ** 2 + (x2 - x1) ** 2)
+            return np.abs(
+                (y2 - y1) * x0 - (x2 - x1) * y0 + x2 * y1 - y2 * x1
+            ) / np.sqrt((y2 - y1) ** 2 + (x2 - x1) ** 2)
 
         def distance_to_point(point1, point2):
             x1, y1 = point1
@@ -342,28 +369,33 @@ class RerunNode(Node):
 
             slope1 = (y2 - y1) / (x2 - x1) if x2 - x1 != 0 else 0
             slope2 = (y4 - y3) / (x4 - x3) if x4 - x3 != 0 else 0
-            return  (
-                        abs(slope1 - slope2) < 0.5 or 
-                        distance_to_line((x1, y1), (x3, y3, x4, y4)) < LINE_MERGE_THRESHOLD and
-                        distance_to_line((x2, y2), (x3, y3, x4, y4)) < LINE_MERGE_THRESHOLD
-                    ) \
-                    and \
-                    (
-                        distance_to_point((x1, y1), (x3, y3)) < LINE_MERGE_THRESHOLD or
-                        distance_to_point((x1, y1), (x4, y4)) < LINE_MERGE_THRESHOLD or
-                        distance_to_point((x2, y2), (x3, y3)) < LINE_MERGE_THRESHOLD or
-                        distance_to_point((x2, y2), (x4, y4)) < LINE_MERGE_THRESHOLD
-                    )
+            return (
+                abs(slope1 - slope2) < 0.5
+                or distance_to_line((x1, y1), (x3, y3, x4, y4)) < LINE_MERGE_THRESHOLD
+                and distance_to_line((x2, y2), (x3, y3, x4, y4)) < LINE_MERGE_THRESHOLD
+            ) and (
+                distance_to_point((x1, y1), (x3, y3)) < LINE_MERGE_THRESHOLD
+                or distance_to_point((x1, y1), (x4, y4)) < LINE_MERGE_THRESHOLD
+                or distance_to_point((x2, y2), (x3, y3)) < LINE_MERGE_THRESHOLD
+                or distance_to_point((x2, y2), (x4, y4)) < LINE_MERGE_THRESHOLD
+            )
 
         def merge_lines(line1, line2):
             x1, y1, x2, y2 = line1[0]
             x3, y3, x4, y4 = line2[0]
             all_points = [(x1, y1), (x2, y2), (x3, y3), (x4, y4)]
             all_points.sort(key=lambda point: (point[0], point[1]))
-            return [[all_points[0][0], all_points[0][1], all_points[-1][0], all_points[-1][1]]]
+            return [
+                [
+                    all_points[0][0],
+                    all_points[0][1],
+                    all_points[-1][0],
+                    all_points[-1][1],
+                ]
+            ]
 
         filtered_lines = lines.tolist() if lines is not None else []
-            
+
         # Modify the lines to go from left to right
         for i, line in enumerate(filtered_lines):
             x1, y1, x2, y2 = line[0]
@@ -371,7 +403,11 @@ class RerunNode(Node):
                 filtered_lines[i] = [[x2, y2, x1, y1]]
 
         # Sort the lines by length
-        filtered_lines.sort(key=lambda line: distance_to_point((line[0][0], line[0][1]), (line[0][2], line[0][3])))
+        filtered_lines.sort(
+            key=lambda line: distance_to_point(
+                (line[0][0], line[0][1]), (line[0][2], line[0][3])
+            )
+        )
 
         for i in range(0, len(filtered_lines)):
             for j in range(i + 1, len(filtered_lines)):
@@ -401,18 +437,41 @@ class RerunNode(Node):
             x1, y1, x2, y2 = line[0]
             cv2.line(edged_filtered, (x1, y1), (x2, y2), (255, 0, 0), 2)
 
-
-        map_origin = np.array([msg.info.origin.position.x, msg.info.origin.position.y, msg.info.origin.position.z])
+        map_origin = np.array(
+            [
+                msg.info.origin.position.x,
+                msg.info.origin.position.y,
+                msg.info.origin.position.z,
+            ]
+        )
         # Calculate the position of the robot in the occupancy grid
-        robot_position = np.array([transform.transform.translation.x, transform.transform.translation.y, transform.transform.translation.z])
+        robot_position = np.array(
+            [
+                transform.transform.translation.x,
+                transform.transform.translation.y,
+                transform.transform.translation.z,
+            ]
+        )
         map_resolution = msg.info.resolution
-        map_origin = np.array([msg.info.origin.position.x, msg.info.origin.position.y, 0])
+        map_origin = np.array(
+            [msg.info.origin.position.x, msg.info.origin.position.y, 0]
+        )
         map_position = (robot_position - map_origin) / map_resolution
 
         # Draw a circle on the occupancy grid image at the robot's position
-        cv2.circle(image_data, (int(map_position[0]), int(map_position[1])), 5, (0, 255, 0), -1)
-        cv2.circle(edged, (int(map_position[0]), int(map_position[1])), 5, (0, 255, 0), -1)
-        cv2.circle(edged_filtered, (int(map_position[0]), int(map_position[1])), 5, (0, 255, 0), -1)
+        cv2.circle(
+            image_data, (int(map_position[0]), int(map_position[1])), 5, (0, 255, 0), -1
+        )
+        cv2.circle(
+            edged, (int(map_position[0]), int(map_position[1])), 5, (0, 255, 0), -1
+        )
+        cv2.circle(
+            edged_filtered,
+            (int(map_position[0]), int(map_position[1])),
+            5,
+            (0, 255, 0),
+            -1,
+        )
 
         rr.log(
             f"{topic_name}/occupancy",
@@ -464,10 +523,7 @@ class RerunNode(Node):
                 indices.append(len(vertices) - 2)
                 indices.append(len(vertices) - 1)
 
-            return rr.Mesh3D(
-                vertex_positions=vertices,
-                triangle_indices=indices
-            )
+            return rr.Mesh3D(vertex_positions=vertices, triangle_indices=indices)
 
         mesh = construct_mesh(filtered_lines)
         rr.log(
@@ -475,39 +531,31 @@ class RerunNode(Node):
             mesh,
         )
 
-        v_pos = [
-            [-1, -1, 0],
-            [1, -1, 0],
-            [-1, 1, 0],
-            [1, 1, 0]
-        ]
+        v_pos = [[-1, -1, 0], [1, -1, 0], [-1, 1, 0], [1, 1, 0]]
 
-        scale = msg.info.height / msg.info.width * 1 / msg.info.resolution + msg.info.resolution * 10
+        scale = (
+            msg.info.height / msg.info.width * 1 / msg.info.resolution
+            + msg.info.resolution * 10
+        )
         scaled_v_pos = [
             [
-                p[0] * scale * msg.info.width / msg.info.height + msg.info.origin.position.x,
+                p[0] * scale * msg.info.width / msg.info.height
+                + msg.info.origin.position.x,
                 p[1] * scale + msg.info.origin.position.y,
                 p[2] * scale + msg.info.origin.position.z,
             ]
-        for p in v_pos]
+            for p in v_pos
+        ]
 
         # Log the image_data on a quad
         rr.log(
             f"{topic_name}/occupancy_quad",
             rr.Mesh3D(
                 vertex_positions=scaled_v_pos,
-                triangle_indices=[
-                    0, 1, 2,
-                    1, 2, 3
-                ],
-                vertex_texcoords=[
-                    [0, 0],
-                    [1, 0],
-                    [0, 1],
-                    [1, 1]
-                ],
+                triangle_indices=[0, 1, 2, 1, 2, 3],
+                vertex_texcoords=[[0, 0], [1, 0], [0, 1], [1, 1]],
                 albedo_texture=image_data,
-            )
+            ),
         )
 
     def urdf_callback(self, urdf_msg, topic_name: str) -> None:
@@ -521,7 +569,10 @@ class RerunNode(Node):
         # urdf.scene.graph.update(frame_to="camera_link", matrix=orig.dot(scale))
         scaled = urdf.scene.scaled(1.0)
 
-        rerun_urdf.log_scene(scene=scaled, node=urdf.base_link, path=topic_name, static=True)
+        rerun_urdf.log_scene(
+            scene=scaled, node=urdf.base_link, path=topic_name, static=True
+        )
+
 
 def main(args=None):
     """This is just an example on how to use the RerunNode."""
@@ -535,7 +586,7 @@ def main(args=None):
         "/tf",
         "/scan",
         "/joint_group_effort_controller/joint_trajectory",
-        "/map"
+        "/map",
     }
     rerun_node = RerunNode(lidar_visualization_option=LidarVisualizationOption.Colour)
     rerun_node.load_urdf(
